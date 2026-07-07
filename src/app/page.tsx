@@ -1,59 +1,99 @@
 'use client';
 
+import Link from 'next/link';
 import { useMatchStore } from '@/stores/match-store';
+import { useSettingsStore } from '@/stores/settings-store';
 
 export default function HomePage() {
-  const createMatch = useMatchStore((state) => state.createMatch);
+  const match = useMatchStore((s) => s.match);
+  const accessibilityMode = useSettingsStore((s) => s.accessibilityMode);
   
-  const handleQuickStart = () => {
-    // Create a sample match for demonstration
-    createMatch(
-      { name: 'Dublin', shortCode: 'DUB', goals: 0, points: 0 },
-      { name: 'Cork', shortCode: 'COR', goals: 0, points: 0 },
-      'gaelic-football'
-    );
-  };
+  const rainMode = accessibilityMode === 'rain-mode';
+  const highContrast = accessibilityMode === 'high-contrast';
+
+  // Check if there's an active match in progress
+  const hasActiveMatch = match && (match.status === 'draft' || match.status === 'first-half' || match.status === 'halftime' || match.status === 'second-half');
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gaa-green to-gaa-green-dark text-white">
+    <div className="mx-auto max-w-2xl px-4 py-6">
       {/* Header */}
-      <header className="bg-black/20 backdrop-blur-sm border-b border-white/10">
-        <div className="max-w-6xl mx-auto px-4 py-6">
-          <h1 className="text-2xl font-bold font-display">MatchDay GAA</h1>
-          <p className="mt-2 text-white/70">Record Gaelic football & hurling matches pitch-side</p>
+      <h1 className={`${rainMode ? 'text-rain-lg' : 'text-2xl'} font-black text-gaa-green mb-6`}>
+        MatchDay GAA
+      </h1>
+
+      {hasActiveMatch && (
+        // Active match banner — link to current match screen
+        <Link href="/matches/active" className="block">
+          <div className={`mb-6 rounded-xl border-2 border-gaa-green bg-green-50 p-4 ${rainMode ? 'p-6' : ''}`}>
+            <p className={`${rainMode ? 'text-rain-md' : 'text-lg'} font-bold text-gaa-green`}>
+              Match in Progress
+            </p>
+            <p className="text-sm text-gray-600">Tap to continue recording</p>
+          </div>
+        </Link>
+      )}
+
+      {/* New Match Button — primary action */}
+      <Link href="/matches/new" className="block mb-4">
+        <button className={`w-full rounded-xl bg-gaa-green py-4 text-center font-bold text-white shadow-lg transition hover:bg-gaa-green-light ${rainMode ? 'text-rain-md min-h-[60px]' : ''}`}>
+          + New Match
+        </button>
+      </Link>
+
+      {/* Quick Settings */}
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          onClick={() => useSettingsStore.getState().setAccessibilityMode(accessibilityMode === 'rain-mode' ? 'standard' : 'rain-mode')}
+          className={`rounded-lg border p-3 text-left ${rainMode ? 'border-gaa-green bg-green-50' : ''}`}
+        >
+          <span className="text-sm font-semibold">🌧️ Rain Mode</span>
+          <p className="text-xs text-gray-500">{rainMode ? 'ON' : 'OFF'}</p>
+        </button>
+
+        <button
+          onClick={() => useSettingsStore.getState().setAccessibilityMode(highContrast ? 'standard' : 'high-contrast')}
+          className={`rounded-lg border p-3 text-left ${highContrast ? 'border-gaa-green bg-yellow-50' : ''}`}
+        >
+          <span className="text-sm font-semibold">☀️ High Contrast</span>
+          <p className="text-xs text-gray-500">{highContrast ? 'ON' : 'OFF'}</p>
+        </button>
+      </div>
+
+      {/* Volunteer Mode Selector */}
+      <div className="mt-4">
+        <h2 className={`mb-2 font-bold ${rainMode ? 'text-rain-md' : ''}`}>Volunteer Role</h2>
+        <div className="flex gap-2">
+          {(['volunteer', 'coach', 'administrator'] as const).map((role) => (
+            <button
+              key={role}
+              onClick={() => useSettingsStore.getState().setVolunteerRole(role)}
+              className={`flex-1 rounded-lg border p-3 text-center capitalize transition ${
+                useSettingsStore.getState().volunteerRole === role
+                  ? 'border-gaa-green bg-green-50 font-bold'
+                  : ''
+              }`}
+            >
+              {role}
+            </button>
+          ))}
         </div>
-      </header>
+      </div>
 
-      {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-12">
-        {/* Hero Section */}
-        <section className="text-center mb-12">
-          <h2 className="text-4xl font-bold mb-4">Match Recording, Simplified</h2>
-          <p className="text-xl text-white/80 max-w-2xl mx-auto">
-            Offline-first match statistics for GAA clubs. Record scores, cards, substitutions, and more — even without internet.
-          </p>
-        </section>
-
-        {/* Quick Start Button */}
-        <div className="text-center">
-          <button
-            onClick={handleQuickStart}
-            className="btn-touch bg-gaa-gold text-black font-semibold px-8 py-4 rounded-lg hover:bg-gaa-gold-light transition-colors"
+      {/* Quick Stats */}
+      <div className="mt-6 rounded-xl border p-4">
+        <h3 className={`mb-2 font-bold ${rainMode ? 'text-rain-md' : ''}`}>Quick Actions</h3>
+        <div className="grid grid-cols-2 gap-2">
+          <Link href="/matches/new" className="rounded-lg bg-blue-50 p-3 text-center hover:bg-blue-100">
+            <span className="text-sm font-semibold">📋 Record Match</span>
+          </Link>
+          <button 
+            onClick={() => useSettingsStore.getState().setAccessibilityMode('large-text')}
+            className="rounded-lg bg-purple-50 p-3 text-center hover:bg-purple-100"
           >
-            Start New Match
+            <span className="text-sm font-semibold">🔍 Large Text</span>
           </button>
-          <p className="mt-4 text-white/60 text-sm">
-            Demo mode — works offline without Supabase
-          </p>
         </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-white/10 mt-12">
-        <div className="max-w-6xl mx-auto px-4 py-6 text-center text-white/50 text-sm">
-          MatchDay GAA — Built for GAA clubs, by tech volunteers
-        </div>
-      </footer>
+      </div>
     </div>
   );
 }

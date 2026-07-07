@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import Scoreboard from "@/components/scoreboard/Scoreboard";
+import UndoButton from "@/components/undo-button/UndoButton";
 
 export const metadata: Metadata = {
   title: "MatchDay GAA — Match Recording App",
@@ -22,7 +24,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-gray-50">{children}</body>
+      <body className="min-h-screen bg-gray-50">
+        <Scoreboard />
+        <main className="pt-16 pb-20">{children}</main>
+        <UndoButton />
+      </body>
     </html>
   );
 }
