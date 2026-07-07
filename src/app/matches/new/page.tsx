@@ -15,6 +15,17 @@ const GRADE_DURATIONS: Record<string, number> = {
   minor: 25,         // Minor: 50 min total
 };
 
+// Common GAA competitions — UR-085
+const COMPETITIONS = [
+  { value: '', label: 'Select competition...' },
+  { value: 'all_ireland_sfc', label: 'All-Ireland Senior Football Championship' },
+  { value: 'national_league', label: 'National Football League' },
+  { value: 'ulster_sfc', label: 'Ulster Senior Football Championship' },
+  { value: 'leinster_sfc', label: 'Leinster Senior Football Championship' },
+  { value: 'munster_sfc', label: 'Munster Senior Football Championship' },
+  { value: 'connaught_sfc', label: 'Connacht Senior Football Championship' },
+];
+
 export default function NewMatchPage() {
   const router = useRouter();
   const createMatch = useMatchStore((s) => s.createMatch);
@@ -26,6 +37,9 @@ export default function NewMatchPage() {
   const [grade, setGrade] = useState<string>('senior');
   const [homeTeam, setHomeTeam] = useState('');
   const [awayTeam, setAwayTeam] = useState('');
+  const [venue, setVenue] = useState('');
+  const [referee, setReferee] = useState('');
+  const [competition, setCompetition] = useState('');
 
   const handleCreate = () => {
     if (!homeTeam || !awayTeam) return;
@@ -36,6 +50,16 @@ export default function NewMatchPage() {
       { name: awayTeam, shortCode: awayTeam.substring(0, 3).toUpperCase(), goals: 0, points: 0 },
       sport
     );
+
+    // Update venue and referee if provided
+    if (venue || referee) {
+      const { match } = useMatchStore.getState();
+      if (match) {
+        useMatchStore.setState({
+          match: { ...match, venue, referee }
+        });
+      }
+    }
 
     // Start the match and navigate to live screen
     const { startMatch } = useMatchStore.getState();
@@ -88,6 +112,44 @@ export default function NewMatchPage() {
             </option>
           ))}
         </select>
+      </div>
+
+      {/* Competition Selection (UR-085) */}
+      <div className="mb-4">
+        <label className={`block mb-1 font-semibold ${rainMode ? 'text-rain-md' : ''}`}>Competition</label>
+        <select
+          value={competition}
+          onChange={(e) => setCompetition(e.target.value)}
+          className={`w-full rounded-lg border p-3 ${rainMode ? 'min-h-[60px] text-xl' : ''}`}
+        >
+          {COMPETITIONS.map((c) => (
+            <option key={c.value} value={c.value}>{c.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Venue (UR-002) */}
+      <div className="mb-4">
+        <label className={`block mb-1 font-semibold ${rainMode ? 'text-rain-md' : ''}`}>Venue</label>
+        <input
+          type="text"
+          value={venue}
+          onChange={(e) => setVenue(e.target.value)}
+          placeholder="e.g. Croke Park, Páirc Tailteann..."
+          className={`w-full rounded-lg border p-3 ${rainMode ? 'min-h-[60px] text-xl' : ''}`}
+        />
+      </div>
+
+      {/* Referee (UR-002) */}
+      <div className="mb-4">
+        <label className={`block mb-1 font-semibold ${rainMode ? 'text-rain-md' : ''}`}>Referee</label>
+        <input
+          type="text"
+          value={referee}
+          onChange={(e) => setReferee(e.target.value)}
+          placeholder="Enter referee name..."
+          className={`w-full rounded-lg border p-3 ${rainMode ? 'min-h-[60px] text-xl' : ''}`}
+        />
       </div>
 
       {/* Team Selection */}
