@@ -1,0 +1,146 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #1a1a1a;
+  --card-background: #f9fafb;
+  --card-border: #e5e7eb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+    --card-background: #1f1f1f;
+    --card-border: #374151;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Rain Mode - High visibility in wet conditions */
+.rain-mode {
+  background-color: #000000 !important;
+  color: #00ff00 !important;
+}
+
+.rain-mode * {
+  border-color: #00ff00 !important;
+  background-color: #000000 !important;
+  color: #00ff00 !important;
+}
+
+.rain-mode .score-display {
+  font-size: 3rem !important;
+  text-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00;
+}
+
+/* High Contrast Mode */
+.high-contrast {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+
+.high-contrast * {
+  border-width: 2px !important;
+  border-color: #ffffff !important;
+}
+
+.high-contrast button,
+.high-contrast .btn-primary {
+  background-color: #FFD700 !important;
+  color: #000000 !important;
+  font-weight: bold !important;
+}
+
+/* Large Text Mode */
+.large-text {
+  font-size: 125% !important;
+}
+
+.large-text button,
+.large-text .btn {
+  min-height: 64px !important;
+  min-width: 64px !important;
+  font-size: 1.5rem !important;
+}
+
+/* Score Display */
+.score-display {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.05em;
+}
+
+/* Touch-friendly buttons for pitch-side use */
+.btn-touch {
+  min-height: 48px;
+  min-width: 48px;
+  padding: 12px 24px;
+}
+
+/* GAA Theme Colors */
+.bg-gaa-green { background-color: #1B5E20; }
+.bg-gaa-green-light { background-color: #2E7D32; }
+.bg-gaa-gold { background-color: #FFD700; }
+.text-gaa-green { color: #1B5E20; }
+.text-gaa-gold { color: #FFD700; }
+
+/* Pitch-side optimized - large touch targets */
+.pitch-mode .touch-target {
+  min-height: 72px;
+  min-width: 72px;
+}
+
+/* Animation for new events */
+@keyframes slideIn {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(27, 94, 32, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(27, 94, 32, 0.8), 0 0 30px rgba(255, 215, 0, 0.4);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
