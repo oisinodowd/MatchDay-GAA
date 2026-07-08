@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useMatchStore } from '@/stores/match-store';
 import { useSettingsStore } from '@/stores/settings-store';
-import { Target, Crosshair, Trophy } from 'lucide-react';
+import { Target, Crosshair, Trophy, Square, SquareSlash, ShieldAlert } from 'lucide-react';
 
 interface ScoringPanelProps {
   teamSide: 'home' | 'away';
@@ -12,6 +12,7 @@ interface ScoringPanelProps {
 
 export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) {
   const addScore = useMatchStore((s) => s.addScore);
+  const addCard = useMatchStore((s) => s.addCard);
   const match = useMatchStore((s) => s.match);
   const accessibilityMode = useSettingsStore((s) => s.accessibilityMode);
 
@@ -132,6 +133,66 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
       >
         Score without player (assign later)
       </button>
+
+      {/* Discipline Section — Cards (UR-063–71) */}
+      <div className="mt-4 pt-3 border-t">
+        <h4 className={`mb-2 text-xs font-semibold uppercase ${rainMode ? 'text-rain-md' : ''}`}>Discipline</h4>
+        <div className="grid grid-cols-3 gap-2">
+          {/* Yellow Card */}
+          <button
+            onClick={() => {
+              if (!selectedPlayer) return;
+              const playerIndex = parseInt(selectedPlayer.replace('p', '')) - 1;
+              addCard(teamSide, 'yellow', playerIndex);
+              setSelectedPlayer('');
+            }}
+            disabled={!selectedPlayer}
+            className={`flex flex-col items-center justify-center rounded-lg py-4 transition ${
+              selectedPlayer ? 'hover:bg-yellow-50 active:scale-95' : 'bg-gray-100 cursor-not-allowed'
+            } ${rainMode ? 'min-h-[60px]' : ''}`}
+          >
+            <div className="w-8 h-10 bg-yellow-400 rounded border-2 border-black mb-1"></div>
+            <span className={`font-bold text-yellow-700 ${rainMode ? 'text-lg' : ''}`}>Yellow</span>
+            <span className="text-xs text-gray-500">Caution</span>
+          </button>
+
+          {/* Black Card */}
+          <button
+            onClick={() => {
+              if (!selectedPlayer) return;
+              const playerIndex = parseInt(selectedPlayer.replace('p', '')) - 1;
+              addCard(teamSide, 'black', playerIndex);
+              setSelectedPlayer('');
+            }}
+            disabled={!selectedPlayer}
+            className={`flex flex-col items-center justify-center rounded-lg py-4 transition ${
+              selectedPlayer ? 'hover:bg-gray-200 active:scale-95' : 'bg-gray-100 cursor-not-allowed'
+            } ${rainMode ? 'min-h-[60px]' : ''}`}
+          >
+            <div className="w-8 h-10 bg-black rounded border-2 border-white mb-1"></div>
+            <span className={`font-bold text-gray-700 ${rainMode ? 'text-lg' : ''}`}>Black</span>
+            <span className="text-xs text-gray-500">Send-off</span>
+          </button>
+
+          {/* Red Card */}
+          <button
+            onClick={() => {
+              if (!selectedPlayer) return;
+              const playerIndex = parseInt(selectedPlayer.replace('p', '')) - 1;
+              addCard(teamSide, 'red', playerIndex);
+              setSelectedPlayer('');
+            }}
+            disabled={!selectedPlayer}
+            className={`flex flex-col items-center justify-center rounded-lg py-4 transition ${
+              selectedPlayer ? 'hover:bg-red-50 active:scale-95' : 'bg-gray-100 cursor-not-allowed'
+            } ${rainMode ? 'min-h-[60px]' : ''}`}
+          >
+            <div className="w-8 h-10 bg-red-600 rounded border-2 border-white mb-1"></div>
+            <span className={`font-bold text-red-700 ${rainMode ? 'text-lg' : ''}`}>Red</span>
+            <span className="text-xs text-gray-500">Dismissal</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

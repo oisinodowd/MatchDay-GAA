@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useMatchStore } from '@/stores/match-store';
 import { useSettingsStore } from '@/stores/settings-store';
 import { BarChart3, TrendingUp, Target, Award, ArrowLeft } from 'lucide-react';
+import ScoreProgressionChart from '@/components/analytics-charts/ScoreProgressionChart';
+import PitchMap from '@/components/analytics-charts/PitchMap';
 
 export default function AnalyticsPage() {
   const match = useMatchStore((s) => s.match);
@@ -97,18 +99,12 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Score Progression Chart Placeholder */}
-      <div className={`rounded-lg border-2 border-dashed p-8 text-center ${highContrast ? 'border-black' : 'border-gray-300'}`}>
-        <BarChart3 className="w-12 h-12 mx-auto text-gray-400 mb-2" />
-        <p className={`font-semibold ${rainMode ? 'text-rain-md' : ''}`}>Score Progression Chart</p>
-        <p className="text-xs text-gray-400 mt-1">Line chart showing cumulative scores over time — Phase 4 (Recharts)</p>
-      </div>
+      {/* Score Progression Chart */}
+      <ScoreProgressionChart />
 
-      {/* Pitch Map Placeholder */}
-      <div className={`mt-4 rounded-lg border-2 border-dashed p-8 text-center ${highContrast ? 'border-black' : 'border-gray-300'}`}>
-        <Target className="w-12 h-12 mx-auto text-gray-400 mb-2" />
-        <p className={`font-semibold ${rainMode ? 'text-rain-md' : ''}`}>Pitch Map</p>
-        <p className="text-xs text-gray-400 mt-1">SVG pitch with scoring dots — Phase 4 (Scoring zones)</p>
+      {/* Pitch Map */}
+      <div className="mt-4">
+        <PitchMap />
       </div>
 
       {/* Scoring Zone Breakdown */}

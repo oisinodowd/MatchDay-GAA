@@ -123,6 +123,48 @@ export default function ActiveMatchPage() {
         </div>
       </div>
 
+      {/* Phase 3 Navigation — Analytics, Players, Reports */}
+      <div className="mt-6 grid grid-cols-3 gap-2">
+        <Link
+          href="/matches/active/analytics"
+          className="flex flex-col items-center rounded-lg bg-purple-50 p-4 hover:bg-purple-100 transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-purple-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+          <span className="text-xs font-semibold mt-2 text-purple-700">Analytics</span>
+        </Link>
+
+        <Link
+          href="/matches/active/players"
+          className="flex flex-col items-center rounded-lg bg-blue-50 p-4 hover:bg-blue-100 transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          <span className="text-xs font-semibold mt-2 text-blue-700">Players</span>
+        </Link>
+
+        <Link
+          href="/matches/active/reports"
+          className="flex flex-col items-center rounded-lg bg-green-50 p-4 hover:bg-green-100 transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          <span className="text-xs font-semibold mt-2 text-green-700">Reports</span>
+        </Link>
+      </div>
+
       {/* Event Timeline */}
       <div className="mt-6 rounded-xl border p-4">
         <h3 className={`mb-2 font-bold ${match ? '' : 'text-rain-md'}`}>Event Timeline</h3>

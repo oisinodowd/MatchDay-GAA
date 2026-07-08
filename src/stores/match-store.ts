@@ -127,8 +127,13 @@ export const useMatchStore = create<MatchState>()(
       endHalf: () => {
         const { match } = get();
         if (!match) return;
-        
-        if (match.currentHalf === 'first-half') {
+
+        // Check halftime status FIRST (before checking currentHalf)
+        if (match.status === 'halftime') {
+          set({
+            match: { ...match, status: 'second-half', currentHalf: 'second-half', currentMinute: 0 }
+          });
+        } else if (match.currentHalf === 'first-half') {
           set({
             match: { ...match, status: 'halftime', currentMinute: match.halfDuration }
           });

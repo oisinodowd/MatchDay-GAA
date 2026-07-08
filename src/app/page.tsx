@@ -7,6 +7,9 @@ import { useSettingsStore } from '@/stores/settings-store';
 export default function HomePage() {
   const match = useMatchStore((s) => s.match);
   const accessibilityMode = useSettingsStore((s) => s.accessibilityMode);
+  const volunteerRole = useSettingsStore((s) => s.volunteerRole);
+  const setAccessibilityMode = useSettingsStore((s) => s.setAccessibilityMode);
+  const setVolunteerRole = useSettingsStore((s) => s.setVolunteerRole);
   
   const rainMode = accessibilityMode === 'rain-mode';
   const highContrast = accessibilityMode === 'high-contrast';
@@ -43,7 +46,7 @@ export default function HomePage() {
       {/* Quick Settings */}
       <div className="grid grid-cols-2 gap-3">
         <button
-          onClick={() => useSettingsStore.getState().setAccessibilityMode(accessibilityMode === 'rain-mode' ? 'standard' : 'rain-mode')}
+          onClick={() => setAccessibilityMode(rainMode ? 'standard' : 'rain-mode')}
           className={`rounded-lg border p-3 text-left ${rainMode ? 'border-gaa-green bg-green-50' : ''}`}
         >
           <span className="text-sm font-semibold">🌧️ Rain Mode</span>
@@ -51,7 +54,7 @@ export default function HomePage() {
         </button>
 
         <button
-          onClick={() => useSettingsStore.getState().setAccessibilityMode(highContrast ? 'standard' : 'high-contrast')}
+          onClick={() => setAccessibilityMode(highContrast ? 'standard' : 'high-contrast')}
           className={`rounded-lg border p-3 text-left ${highContrast ? 'border-gaa-green bg-yellow-50' : ''}`}
         >
           <span className="text-sm font-semibold">☀️ High Contrast</span>
@@ -66,9 +69,9 @@ export default function HomePage() {
           {(['volunteer', 'coach', 'administrator'] as const).map((role) => (
             <button
               key={role}
-              onClick={() => useSettingsStore.getState().setVolunteerRole(role)}
+              onClick={() => setVolunteerRole(role)}
               className={`flex-1 rounded-lg border p-3 text-center capitalize transition ${
-                useSettingsStore.getState().volunteerRole === role
+                volunteerRole === role
                   ? 'border-gaa-green bg-green-50 font-bold'
                   : ''
               }`}
@@ -87,7 +90,7 @@ export default function HomePage() {
             <span className="text-sm font-semibold">📋 Record Match</span>
           </Link>
           <button 
-            onClick={() => useSettingsStore.getState().setAccessibilityMode('large-text')}
+            onClick={() => setAccessibilityMode('large-text')}
             className="rounded-lg bg-purple-50 p-3 text-center hover:bg-purple-100"
           >
             <span className="text-sm font-semibold">🔍 Large Text</span>
