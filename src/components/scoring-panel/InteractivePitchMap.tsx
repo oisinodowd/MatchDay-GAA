@@ -11,9 +11,8 @@ export default function InteractivePitchMap({ onSelectLocation, onClose }: Inter
   const [hoverX, setHoverX] = useState<number | null>(null);
   const [hoverY, setHoverY] = useState<number | null>(null);
 
-  const handlePitchClick = (e: React.MouseEvent<SVGSVGElement>) => {
-    const svg = e.currentTarget;
-    const rect = svg.getBoundingClientRect();
+  const handlePitchClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
     
@@ -35,15 +34,13 @@ export default function InteractivePitchMap({ onSelectLocation, onClose }: Inter
           </button>
         </div>
 
-        {/* Pitch Map */}
+        {/* Pitch Map with Real Image */}
         <div className="p-4">
-          <svg 
-            viewBox="0 0 300 400" 
-            className="w-full cursor-crosshair rounded-lg shadow-inner"
+          <div 
+            className="relative cursor-crosshair rounded-lg shadow-inner overflow-hidden"
             onClick={handlePitchClick}
             onMouseMove={(e) => {
-              const svg = e.currentTarget;
-              const rect = svg.getBoundingClientRect();
+              const rect = e.currentTarget.getBoundingClientRect();
               setHoverX(((e.clientX - rect.left) / rect.width) * 100);
               setHoverY(((e.clientY - rect.top) / rect.height) * 100);
             }}
@@ -52,71 +49,43 @@ export default function InteractivePitchMap({ onSelectLocation, onClose }: Inter
               setHoverY(null);
             }}
           >
-            {/* Pitch background with gradient */}
-            <defs>
-              <linearGradient id="pitchGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" style={{ stopColor: '#2E7D32', stopOpacity: 1 }} />
-                <stop offset="50%" style={{ stopColor: '#388E3C', stopOpacity: 1 }} />
-                <stop offset="100%" style={{ stopColor: '#2E7D32', stopOpacity: 1 }} />
-              </linearGradient>
-            </defs>
-            
-            {/* Pitch outline */}
-            <rect x="5" y="5" width="290" height="390" fill="url(#pitchGrad)" stroke="white" strokeWidth="2.5" rx="4" />
-            
-            {/* Halfway line */}
-            <line x1="5" y1="200" x2="295" y2="200" stroke="white" strokeWidth="2" />
-            
-            {/* Center circle */}
-            <circle cx="150" cy="200" r="35" fill="none" stroke="white" strokeWidth="2" />
-            <circle cx="150" cy="200" r="4" fill="white" />
-            
-            {/* Penalty areas - larger rectangle (13m box) */}
-            <rect x="60" y="5" width="180" height="80" fill="none" stroke="white" strokeWidth="2" />
-            <rect x="60" y="315" width="180" height="80" fill="none" stroke="white" strokeWidth="2" />
-            
-            {/* Goal areas - smaller rectangle (6m box) */}
-            <rect x="95" y="5" width="110" height="30" fill="none" stroke="white" strokeWidth="2" />
-            <rect x="95" y="365" width="110" height="30" fill="none" stroke="white" strokeWidth="2" />
-            
-            {/* Penalty spots */}
-            <circle cx="150" cy="70" r="3" fill="white" />
-            <circle cx="150" cy="330" r="3" fill="white" />
-            
-            {/* Penalty arcs (semicircles from penalty spot) */}
-            <path d="M 115 70 A 35 35 0 0 1 185 70" fill="none" stroke="white" strokeWidth="2" />
-            <path d="M 115 330 A 35 35 0 0 0 185 330" fill="none" stroke="white" strokeWidth="2" />
-            
-            {/* Corner arcs */}
-            <path d="M 5 15 Q 15 5 25 5" fill="none" stroke="white" strokeWidth="1.5" />
-            <path d="M 275 5 Q 285 5 295 15" fill="none" stroke="white" strokeWidth="1.5" />
-            <path d="M 5 385 Q 15 395 25 395" fill="none" stroke="white" strokeWidth="1.5" />
-            <path d="M 275 395 Q 285 395 295 385" fill="none" stroke="white" strokeWidth="1.5" />
+            {/* Real GAA Pitch Image */}
+            <img 
+              src="/gaa-pitch.png" 
+              alt="GAA Pitch" 
+              className="w-full"
+            />
 
             {/* Hover indicator */}
             {hoverX !== null && hoverY !== null && (
-              <g>
-                <circle 
-                  cx={(hoverX / 100) * 290 + 5} 
-                  cy={(hoverY / 100) * 390 + 5} 
-                  r="8" 
-                  fill="none" 
-                  stroke="#FFD700" 
-                  strokeWidth="3"
+              <div
+                className="absolute pointer-events-none transform -translate-x-1/2 -translate-y-1/2"
+                style={{ 
+                  left: `${hoverX}%`, 
+                  top: `${hoverY}%`
+                }}
+              >
+                {/* Outer ring */}
+                <div
+                  className="rounded-full border-3 border-yellow-400 opacity-80"
+                  style={{ width: '16px', height: '16px' }}
                 />
-                <circle 
-                  cx={(hoverX / 100) * 290 + 5} 
-                  cy={(hoverY / 100) * 390 + 5} 
-                  r="4" 
-                  fill="#FFD700" 
+                {/* Inner dot */}
+                <div
+                  className="absolute inset-0 m-auto rounded-full bg-yellow-400"
+                  style={{ width: '8px', height: '8px' }}
                 />
-              </g>
+              </div>
             )}
 
-            {/* Team zones */}
-            <text x="150" y="180" textAnchor="middle" fill="rgba(255,255,255,0.3)" fontSize="14" fontWeight="bold">HOME HALF</text>
-            <text x="150" y="230" textAnchor="middle" fill="rgba(255,255,255,0.3)" fontSize="14" fontWeight="bold">AWAY HALF</text>
-          </svg>
+            {/* Team zones overlay */}
+            <div className="absolute top-[35%] left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+              <span className="text-white text-xs font-bold opacity-40" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}>HOME HALF</span>
+            </div>
+            <div className="absolute top-[65%] left-1/2 transform -translate-x-1/2 translate-y-1/2">
+              <span className="text-white text-xs font-bold opacity-40" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}>AWAY HALF</span>
+            </div>
+          </div>
 
           {/* Instructions */}
           <p className="mt-3 text-center text-sm text-gray-600">
