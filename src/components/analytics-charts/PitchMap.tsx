@@ -54,6 +54,22 @@ export default function PitchMap() {
               : 50 + Math.random() * 40;
           }
 
+          // Determine base color by score type
+          const isGoal = event.details?.subtype === 'goal';
+          const isTwoPoint = event.details?.isTwoPoint;
+          
+          // Add team distinction: home team gets blue tint, away team gets red tint
+          let outerColor: string, innerColor: string;
+          if (event.teamSide === 'home') {
+            // Home team - blue tones
+            outerColor = isGoal ? 'bg-green-400' : isTwoPoint ? 'bg-orange-400' : 'bg-blue-600';
+            innerColor = isGoal ? 'bg-green-500' : isTwoPoint ? 'bg-orange-500' : 'bg-blue-700';
+          } else {
+            // Away team - red tones
+            outerColor = isGoal ? 'bg-green-400' : isTwoPoint ? 'bg-orange-400' : 'bg-red-600';
+            innerColor = isGoal ? 'bg-green-500' : isTwoPoint ? 'bg-orange-500' : 'bg-red-700';
+          }
+
           return (
             <div
               key={`score-${index}`}
@@ -65,14 +81,12 @@ export default function PitchMap() {
             >
               {/* Outer ring for visibility */}
               <div
-                className={`rounded-full ${event.details?.subtype === 'goal' ? 'bg-green-500' : 
-                      event.details?.isTwoPoint ? 'bg-orange-500' : 'bg-blue-500'} opacity-40`}
+                className={`rounded-full ${outerColor} opacity-40`}
                 style={{ width: '16px', height: '16px' }}
               />
               {/* Inner dot */}
               <div
-                className={`absolute inset-0 m-auto rounded-full border-2 border-white ${event.details?.subtype === 'goal' ? 'bg-green-500' : 
-                      event.details?.isTwoPoint ? 'bg-orange-500' : 'bg-blue-500'}`}
+                className={`absolute inset-0 m-auto rounded-full border-2 border-white ${innerColor}`}
                 style={{ width: '10px', height: '10px' }}
               />
             </div>
@@ -114,10 +128,14 @@ export default function PitchMap() {
       </div>
 
       {/* Legend */}
-      <div className="mt-3 flex justify-center gap-4 text-xs text-gray-500">
-        <span>🔵 Point (1pt)</span>
-        <span>🟢 Goal (3pts)</span>
-        <span>🟠 2-Point Shot</span>
+      <div className="mt-3 space-y-2">
+        <div className="text-xs font-semibold text-gray-700 mb-1">Score Types:</div>
+        <div className="flex flex-wrap justify-center gap-3 text-xs">
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-600"></span> Point (Home)</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-red-600"></span> Point (Away)</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-green-500"></span> Goal</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-orange-400"></span> 2-Point Shot</span>
+        </div>
       </div>
     </div>
   );
