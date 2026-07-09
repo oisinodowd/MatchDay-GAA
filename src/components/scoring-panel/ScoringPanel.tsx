@@ -90,11 +90,8 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
 
     const playerIndex = selectedPlayer ? parseInt(selectedPlayer.replace('p', '')) - 1 : undefined;
 
-    // Convert percentage to SVG coordinates (300x400)
-    const svgX = (x / 100) * 290 + 5;
-    const svgY = (y / 100) * 390 + 5;
-
-    addScore(teamSide, subtype, playerIndex, isTwoPoint, svgX, svgY);
+    // Store percentage coordinates directly (0-100) for display on pitch image
+    addScore(teamSide, subtype, playerIndex, isTwoPoint, x, y);
 
     // Reset selection after scoring (one-tap flow: select player → tap score type)
     setSelectedPlayer('');

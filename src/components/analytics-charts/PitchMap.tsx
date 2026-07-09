@@ -33,11 +33,26 @@ export default function PitchMap() {
           const locationX = event.details?.locationX;
           const locationY = event.details?.locationY;
           
-          // Use actual location if available, otherwise calculate based on team side
-          let x = locationX !== undefined ? locationX : (150 + (Math.random() - 0.5) * 200);
-          let y = locationY !== undefined ? locationY : (event.teamSide === 'home' 
-            ? 30 + Math.random() * 170  
-            : 200 + Math.random() * 170);
+          // Convert stored coordinates to percentages for display on image
+          // Old events have SVG pixel values (0-295/0-395), new events have percentages (0-100)
+          let x: number, y: number;
+          if (locationX !== undefined && locationY !== undefined) {
+            // If coordinates are > 100, they're SVG pixel values - convert to percentage
+            if (locationX > 100 || locationY > 100) {
+              x = (locationX / 295) * 100;
+              y = (locationY / 395) * 100;
+            } else {
+              // Already percentages
+              x = locationX;
+              y = locationY;
+            }
+          } else {
+            // Fallback to random position based on team side
+            x = 15 + Math.random() * 70;
+            y = event.teamSide === 'home' 
+              ? 10 + Math.random() * 40  
+              : 50 + Math.random() * 40;
+          }
 
           return (
             <div
