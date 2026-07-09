@@ -41,6 +41,8 @@ export interface MatchEvent {
     isTwoPoint?: boolean;
     cardType?: 'yellow' | 'black' | 'red';
     playerOutIndex?: number;
+    locationX?: number; // 0-100 percentage on pitch width
+    locationY?: number; // 0-100 percentage on pitch height
   };
 }
 
@@ -70,7 +72,7 @@ interface MatchState {
   completeMatch: () => void;
   
   // Scoring
-  addScore: (teamSide: 'home' | 'away', subtype: 'goal' | 'point' | 'free' | '65-meter' | '40m-point', playerIndex?: number, isTwoPoint?: boolean) => void;
+  addScore: (teamSide: 'home' | 'away', subtype: 'goal' | 'point' | 'free' | '65-meter' | '40m-point', playerIndex?: number, isTwoPoint?: boolean, locationX?: number, locationY?: number) => void;
   
   // Cards
   addCard: (teamSide: 'home' | 'away', cardType: 'yellow' | 'black' | 'red', playerIndex: number) => void;
@@ -152,7 +154,7 @@ export const useMatchStore = create<MatchState>()(
         }));
       },
 
-      addScore: (teamSide: 'home' | 'away', subtype: 'goal' | 'point' | 'free' | '65-meter' | '40m-point', playerIndex?: number, isTwoPoint = false) => {
+      addScore: (teamSide: 'home' | 'away', subtype: 'goal' | 'point' | 'free' | '65-meter' | '40m-point', playerIndex?: number, isTwoPoint = false, locationX?: number, locationY?: number) => {
         set((state) => {
           if (!state.match) return state;
           
@@ -174,14 +176,19 @@ export const useMatchStore = create<MatchState>()(
           newMatch.teamHome = homeTeam;
           newMatch.teamAway = awayTeam;
           
-          // Add event
+          // Add event with location data
           const event: MatchEvent = {
             type: 'score',
             teamSide,
             playerIndex,
             minute: newMatch.currentMinute,
             half: newMatch.currentHalf,
-            details: { subtype, isTwoPoint }
+            details: { 
+              subtype, 
+              isTwoPoint,
+              locationX,
+              locationY
+            }
           };
           
           newMatch.events = [...newMatch.events, event];

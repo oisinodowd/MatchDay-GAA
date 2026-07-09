@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useMatchStore } from '@/stores/match-store';
 import { useSettingsStore } from '@/stores/settings-store';
-import { Target, Crosshair, Trophy, Square, SquareSlash, ShieldAlert } from 'lucide-react';
+import { Target, Crosshair, Trophy, Square, SquareSlash, ShieldAlert, MapPin } from 'lucide-react';
+import InteractivePitchMap from './InteractivePitchMap';
 
 interface ScoringPanelProps {
   teamSide: 'home' | 'away';
@@ -21,7 +22,11 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
 
   const [selectedPlayer, setSelectedPlayer] = useState<string>('');
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [pendingScore, setPendingScore] = useState<'point' | 'two_point' | null>(null);
+  const [pendingScore, setPendingScore] = useState<'point' | 'two_point' | 'goal' | null>(null);
+  
+  // Interactive pitch map state for location selection
+  const [showPitchMap, setShowPitchMap] = useState(false);
+  const [pendingLocation, setPendingLocation] = useState<{ x: number; y: number } | null>(null);
 
   // Mock player list — in production this comes from match_players table
   const players = Array.from({ length: 21 }, (_, i) => ({
@@ -30,6 +35,16 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
     number: i + 1,
     isStarter: i < 15,
   }));
+
+  const handleScoreClick = (type: 'point' | 'two_point' | 'goal') => {
+    if (!selectedPlayer) {
+      return; // Need player selection for individual scores
+    }
+    
+    // Show pitch map for location selection before recording
+    setPendingLocation(null);
+    setShowPitchMap(true);
+  };
 
   const handleScore = (type: 'point' | 'two_point' | 'goal') => {
     if (!selectedPlayer) {
@@ -54,6 +69,44 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
 
     // Reset selection after scoring (one-tap flow: select player → tap score type)
     setSelectedPlayer('');
+  };
+
+  const handleLocationSelect = (x: number, y: number) => {
+    setPendingLocation({ x, y });
+    
+    if (!selectedPlayer || !pendingScore) return;
+    
+    let subtype: 'goal' | 'point' | 'free' | '65-meter' | '40m-point' = 'point';
+    let isTwoPoint = false;
+
+    if (pendingScore === 'goal') {
+      subtype = 'goal';
+    } else if (pendingScore === 'two_point') {
+      subtype = '40m-point';
+      isTwoPoint = true;
+    } else {
+      subtype = 'point';
+    }
+
+    const playerIndex = selectedPlayer ? parseInt(selectedPlayer.replace('p', '')) - 1 : undefined;
+
+    // Convert percentage to SVG coordinates (300x400)
+    const svgX = (x / 100) * 290 + 5;
+    const svgY = (y / 100) * 390 + 5;
+
+    addScore(teamSide, subtype, playerIndex, isTwoPoint, svgX, svgY);
+
+    // Reset selection after scoring (one-tap flow: select player → tap score type)
+    setSelectedPlayer('');
+    setShowPitchMap(false);
+    setPendingLocation(null);
+    setPendingScore(null);
+  };
+
+  const handleClosePitchMap = () => {
+    setShowPitchMap(false);
+    setPendingLocation(null);
+    setPendingScore(null);
   };
 
   return (
@@ -86,7 +139,7 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
       <div className="grid grid-cols-3 gap-2">
         {/* Point Button */}
         <button
-          onClick={() => handleScore('point')}
+          onClick={() => { setPendingScore('point'); handleScoreClick('point'); }}
           disabled={!selectedPlayer}
           className={`flex flex-col items-center justify-center rounded-lg bg-blue-100 py-4 transition ${
             selectedPlayer ? 'hover:bg-blue-200 active:scale-95' : 'bg-gray-100 cursor-not-allowed'
@@ -99,7 +152,7 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
 
         {/* Two-Point Button (2025 rule — UR-034) */}
         <button
-          onClick={() => handleScore('two_point')}
+          onClick={() => { setPendingScore('two_point'); handleScoreClick('two_point'); }}
           disabled={!selectedPlayer}
           className={`flex flex-col items-center justify-center rounded-lg bg-orange-100 py-4 transition ${
             selectedPlayer ? 'hover:bg-orange-200 active:scale-95' : 'bg-gray-100 cursor-not-allowed'
@@ -112,7 +165,7 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
 
         {/* Goal Button */}
         <button
-          onClick={() => handleScore('goal')}
+          onClick={() => { setPendingScore('goal'); handleScoreClick('goal'); }}
           disabled={!selectedPlayer}
           className={`flex flex-col items-center justify-center rounded-lg bg-green-100 py-4 transition ${
             selectedPlayer ? 'hover:bg-green-200 active:scale-95' : 'bg-gray-100 cursor-not-allowed'
@@ -123,6 +176,14 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
           <span className="text-xs text-gray-500">+3 pts</span>
         </button>
       </div>
+
+      {/* Interactive Pitch Map Modal */}
+      {showPitchMap && (
+        <InteractivePitchMap
+          onSelectLocation={handleLocationSelect}
+          onClose={handleClosePitchMap}
+        />
+      )}
 
       {/* UR-038: Team-only score (no player assigned) */}
       <button
