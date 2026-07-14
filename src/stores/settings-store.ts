@@ -1,8 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export type AccessibilityMode = 'standard' | 'rain-mode' | 'high-contrast' | 'large-text';
-export type VolunteerRole = 'volunteer' | 'coach' | 'administrator';
+export type AccessibilityMode = 'standard' | 'rain-mode' | 'large-text';
 
 interface SettingsState {
   // Accessibility
@@ -14,9 +13,7 @@ interface SettingsState {
   defaultSport: 'gaelic-football' | 'hurling';
   extraTimeEnabled: boolean;
   
-  // Volunteer Mode
-  volunteerRole: VolunteerRole;
-  isVolunteerMode: boolean;
+
   
   // Display
   showPitchMap: boolean;
@@ -25,7 +22,6 @@ interface SettingsState {
   // Actions - Accessibility
   setAccessibilityMode: (mode: AccessibilityMode) => void;
   toggleRainMode: () => void;
-  toggleHighContrast: () => void;
   toggleLargeText: () => void;
   setFontSizeMultiplier: (size: number) => void;
   
@@ -34,9 +30,7 @@ interface SettingsState {
   setDefaultSport: (sport: 'gaelic-football' | 'hurling') => void;
   toggleExtraTime: () => void;
   
-  // Actions - Volunteer Mode
-  setVolunteerRole: (role: VolunteerRole) => void;
-  toggleVolunteerMode: () => void;
+
   
   // Actions - Display
   setShowPitchMap: (show: boolean) => void;
@@ -54,8 +48,6 @@ export const useSettingsStore = create<SettingsState>()(
       defaultHalfDuration: 30,
       defaultSport: 'gaelic-football',
       extraTimeEnabled: false,
-      volunteerRole: 'volunteer',
-      isVolunteerMode: false,
       showPitchMap: true,
       showTimeline: true,
 
@@ -69,12 +61,7 @@ export const useSettingsStore = create<SettingsState>()(
         });
       },
       
-      toggleHighContrast: () => {
-        const current = get().accessibilityMode;
-        set({ 
-          accessibilityMode: current === 'high-contrast' ? 'standard' : 'high-contrast'
-        });
-      },
+
       
       toggleLargeText: () => {
         const current = get().accessibilityMode;
@@ -94,15 +81,7 @@ export const useSettingsStore = create<SettingsState>()(
         set({ extraTimeEnabled: !extraTimeEnabled });
       },
 
-      setVolunteerRole: (volunteerRole) => set({ volunteerRole }),
-      
-      toggleVolunteerMode: () => {
-        const { isVolunteerMode, volunteerRole } = get();
-        set({ 
-          isVolunteerMode: !isVolunteerMode,
-          volunteerRole: !isVolunteerMode ? 'coach' : volunteerRole
-        });
-      },
+
 
       setShowPitchMap: (showPitchMap) => set({ showPitchMap }),
       setShowTimeline: (showTimeline) => set({ showTimeline }),
@@ -113,8 +92,6 @@ export const useSettingsStore = create<SettingsState>()(
         defaultHalfDuration: 30,
         defaultSport: 'gaelic-football',
         extraTimeEnabled: false,
-        volunteerRole: 'volunteer',
-        isVolunteerMode: false,
         showPitchMap: true,
         showTimeline: true
       })

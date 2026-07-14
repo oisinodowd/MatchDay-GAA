@@ -1,17 +1,22 @@
 'use client';
 
 import Link from 'next/link';
-import { useMatchStore } from '@/stores/match-store';
+import { useMatchStore, Player } from '@/stores/match-store';
 import { useSettingsStore } from '@/stores/settings-store';
-import { ArrowLeft, User, Trophy } from 'lucide-react';
+import { ArrowLeft, User, Trophy, Search, Filter } from 'lucide-react';
+import { useState, useMemo } from 'react';
 
 export default function PlayersPage() {
   const match = useMatchStore((s) => s.match);
   const accessibilityMode = useSettingsStore((s) => s.accessibilityMode);
 
   const rainMode = accessibilityMode === 'rain-mode';
-  const highContrast = accessibilityMode === 'high-contrast';
   const largeText = accessibilityMode === 'large-text';
+
+  // Search and filter state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterTeam, setFilterTeam] = useState<'all' | 'home' | 'away'>('all');
+  const [filterRole, setFilterRole] = useState<'all' | 'starter' | 'substitute'>('all');
 
   if (!match) {
     return (
@@ -59,53 +64,144 @@ export default function PlayersPage() {
     }
   });
 
-  // Generate player roster display
-  const renderPlayerList = (teamName: string, teamSide: 'home' | 'away', isStarter: boolean) => {
+  // Get team players with their stats
+  const getTeamPlayersWithStats = (teamSide: 'home' | 'away') => {
+    const team = teamSide === 'home' ? match.teamHome : match.teamAway;
     const stats = teamSide === 'home' ? homePlayerStats : awayPlayerStats;
     
+    return team.players.map((player, index) => ({
+      player,
+      stats: stats[index] || { goals: 0, points: 0, cards: 0 },
+      teamSide,
+    }));
+  };
+
+  const homePlayersWithStats = getTeamPlayersWithStats('home');
+  const awayPlayersWithStats = getTeamPlayersWithStats('away');
+
+  // Filter players based on search and filters
+  const filteredPlayers = useMemo(() => {
+    const allPlayers = [
+      ...homePlayersWithStats.map(p => ({ ...p, teamName: match.teamHome.name })),
+      ...awayPlayersWithStats.map(p => ({ ...p, teamName: match.teamAway.name })),
+    ];
+
+    return allPlayers.filter(({ player, teamSide }) => {
+      // Team filter
+      if (filterTeam !== 'all' && teamSide !== filterTeam) return false;
+      
+      // Role filter
+      if (filterRole === 'starter' && !player.isStarter) return false;
+      if (filterRole === 'substitute' && player.isStarter) return false;
+      
+      // Search filter
+      if (searchTerm) {
+        const search = searchTerm.toLowerCase();
+        return (
+          player.name.toLowerCase().includes(search) ||
+          player.number.toString().includes(search) ||
+          (player.position || '').toLowerCase().includes(search)
+        );
+      }
+      
+      return true;
+    });
+  }, [homePlayersWithStats, awayPlayersWithStats, filterTeam, filterRole, searchTerm]);
+
+  // Render player row with photo and stats
+  const renderPlayerRow = (player: Player, stats: PlayerStats, teamSide: 'home' | 'away', index: number) => {
+    const teamName = teamSide === 'home' ? match.teamHome.name : match.teamAway.name;
+    const teamColor = teamSide === 'home' ? 'blue' : 'red';
+    
     return (
-      <div key={teamName} className="mb-4">
-        <h3 className={`font-bold mb-2 ${rainMode ? 'text-rain-md' : ''}`}>
-          {isStarter ? `Starting 15 — ${teamName}` : `Substitutes — ${teamName}`}
-        </h3>
-        <div className="space-y-1">
-          {Array.from({ length: isStarter ? 15 : 6 }, (_, i) => {
-            const playerNumber = isStarter ? i + 1 : i + 16;
-            const playerStats = stats[i];
-            
-            return (
-              <div 
-                key={playerNumber}
-                className={`flex items-center gap-3 rounded-lg border p-2 ${rainMode ? 'min-h-[60px]' : ''} ${highContrast ? 'border-black' : ''}`}
-              >
-                <span className="font-mono font-bold w-8 text-gaa-green">#{playerNumber}</span>
-                <span className={`flex-1 ${largeText ? 'text-base' : ''}`}>Player {playerNumber}</span>
-                {playerStats && (
-                  <div className="text-xs flex gap-2">
-                    {playerStats.goals > 0 && (
-                      <span className="font-bold text-green-600" title={`${playerStats.goals} goals`}>
-                        {playerStats.goals}G
-                      </span>
-                    )}
-                    {playerStats.points > 0 && (
-                      <span className="font-bold text-blue-600" title={`${playerStats.points} points`}>
-                        {playerStats.points}P
-                      </span>
-                    )}
-                    {playerStats.cards > 0 && (
-                      <span className="font-bold text-red-600" title={`${playerStats.cards} cards`}>
-                        {playerStats.cards}C
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+      <div 
+        key={player.id || index}
+        className={`flex items-center gap-3 p-3 rounded-lg border ${rainMode ? 'min-h-[70px]' : ''} ${
+          player.isStarter ? 'border-green-200 bg-green-50/50' : 'border-gray-200 bg-white'
+        }`}
+      >
+        {/* Player Photo */}
+        <div className="relative flex-shrink-0">
+          {player.photoUrl ? (
+            <img
+              src={player.photoUrl}
+              alt={player.name || `Player ${index + 1}`}
+              className={`w-10 h-10 rounded-full object-cover border-2 border-${teamColor}-300`}
+            />
+          ) : (
+            <div className={`w-10 h-10 rounded-full bg-${teamColor}-100 flex items-center justify-center border-2 border-${teamColor}-300`}>
+              <span className={`text-sm font-bold text-${teamColor}-700`}>{player.number}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Player Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className={`font-mono font-bold text-${teamColor}-600`}>#{player.number}</span>
+            <span className={`font-semibold truncate ${largeText ? 'text-base' : ''}`}>
+              {player.name || `Player ${index + 1}`}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <span className={`px-1.5 py-0.5 rounded ${getPositionColor(player.position)}`}>
+              {player.position || 'SUB'}
+            </span>
+            {player.isStarter ? (
+              <span className="text-green-600 font-medium">Starter</span>
+            ) : (
+              <span className="text-orange-600 font-medium">Substitute</span>
+            )}
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="flex items-center gap-3 text-sm">
+          {stats.goals > 0 && (
+            <div className="text-center" title={`${stats.goals} goals`}>
+              <span className="font-bold text-green-600">{stats.goals}</span>
+              <span className="text-xs text-gray-500 block">G</span>
+            </div>
+          )}
+          {stats.points > 0 && (
+            <div className="text-center" title={`${stats.points} points`}>
+              <span className="font-bold text-blue-600">{stats.points}</span>
+              <span className="text-xs text-gray-500 block">P</span>
+            </div>
+          )}
+          {stats.cards > 0 && (
+            <div className="text-center" title={`${stats.cards} cards`}>
+              <span className="font-bold text-red-600">{stats.cards}</span>
+              <span className="text-xs text-gray-500 block">C</span>
+            </div>
+          )}
         </div>
       </div>
     );
   };
+
+  const getPositionColor = (position?: string) => {
+    switch (position) {
+      case 'GK': return 'bg-yellow-100 text-yellow-700';
+      case 'DEF': return 'bg-blue-100 text-blue-700';
+      case 'MID': return 'bg-green-100 text-green-700';
+      case 'FWD': return 'bg-red-100 text-red-700';
+      default: return 'bg-gray-100 text-gray-600';
+    }
+  };
+
+  // Get top scorers from all players
+  const topScorers = useMemo(() => {
+    const allPlayers = [
+      ...homePlayersWithStats.map((p, i) => ({ team: 'home' as const, index: i, player: p.player, stats: homePlayerStats[i] || { goals: 0, points: 0 } })),
+      ...awayPlayersWithStats.map((p, i) => ({ team: 'away' as const, index: i, player: p.player, stats: awayPlayerStats[i] || { goals: 0, points: 0 } })),
+    ];
+
+    return allPlayers
+      .filter(p => p.stats.goals > 0 || p.stats.points > 0)
+      .sort((a, b) => (b.stats.goals * 3 + b.stats.points) - (a.stats.goals * 3 + a.stats.points))
+      .slice(0, 5);
+  }, [homePlayersWithStats, awayPlayersWithStats]);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
@@ -118,6 +214,44 @@ export default function PlayersPage() {
       <h1 className={`${rainMode ? 'text-rain-lg' : 'text-2xl'} font-black text-gaa-green mb-6`}>
         Players & Squad
       </h1>
+
+      {/* Search and Filters */}
+      <div className="mb-4 space-y-3">
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search players by name, number, or position..."
+            className={`input-field pl-9 ${rainMode ? 'min-h-[50px] text-lg' : ''}`}
+          />
+        </div>
+
+        {/* Filters */}
+        <div className="flex gap-2">
+          <select
+            value={filterTeam}
+            onChange={(e) => setFilterTeam(e.target.value as 'all' | 'home' | 'away')}
+            className={`input-field text-sm ${rainMode ? 'min-h-[40px] text-base' : ''}`}
+          >
+            <option value="all">All Teams</option>
+            <option value="home">{match.teamHome.name}</option>
+            <option value="away">{match.teamAway.name}</option>
+          </select>
+
+          <select
+            value={filterRole}
+            onChange={(e) => setFilterRole(e.target.value as 'all' | 'starter' | 'substitute')}
+            className={`input-field text-sm ${rainMode ? 'min-h-[40px] text-base' : ''}`}
+          >
+            <option value="all">All Players</option>
+            <option value="starter">Starters Only</option>
+            <option value="substitute">Substitutes Only</option>
+          </select>
+        </div>
+      </div>
 
       {/* Unassigned Scores Warning */}
       {(() => {
@@ -143,11 +277,18 @@ export default function PlayersPage() {
         return null;
       })()}
 
-      {/* Home Team */}
-      {renderPlayerList(match.teamHome.name, 'home', true)}
-
-      {/* Away Team */}
-      {renderPlayerList(match.teamAway.name, 'away', true)}
+      {/* Filtered Players List */}
+      {filteredPlayers.length > 0 ? (
+        <div className="space-y-2 mb-6">
+          {filteredPlayers.map(({ player, stats, teamSide }, index) => (
+            renderPlayerRow(player, stats, teamSide, index)
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-8 text-gray-500">
+          No players match your filters.
+        </div>
+      )}
 
       {/* Player Stats Summary */}
       <div className={`mt-6 rounded-lg border p-4 ${rainMode ? 'bg-rain-card' : ''}`}>
@@ -160,37 +301,28 @@ export default function PlayersPage() {
         </p>
 
         {/* Top Scorers */}
-        {(() => {
-          const allStats = [...Object.entries(homePlayerStats).map(([k, v]) => ({ team: 'home', index: Number(k), ...v })), 
-                            ...Object.entries(awayPlayerStats).map(([k, v]) => ({ team: 'away', index: Number(k), ...v }))];
-          const topScorers = allStats
-            .filter(s => s.goals > 0 || s.points > 0)
-            .sort((a, b) => (b.goals * 3 + b.points) - (a.goals * 3 + a.points))
-            .slice(0, 5);
-
-          if (topScorers.length === 0) return null;
-
-          return (
-            <div className="mt-3">
-              <p className={`text-sm font-semibold mb-2 ${rainMode ? 'text-rain-md' : ''}`}>Top Scorers</p>
-              {topScorers.map((s, idx) => (
-                <div key={idx} className={`flex items-center gap-2 text-xs py-1 border-b ${highContrast ? 'border-gray-300' : 'border-gray-200'}`}>
-                  <span className="font-bold w-6">#{idx + 1}</span>
-                  <span className={`w-12 px-1 rounded text-xs ${s.team === 'home' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
-                    {s.team === 'home' ? match.teamHome.name.substring(0, 3).toUpperCase() : match.teamAway.name.substring(0, 3).toUpperCase()}
-                  </span>
-                  <span className="flex-1">Player {s.index + 1}</span>
-                  <span className="font-bold text-green-600">{s.goals}G</span>
-                  <span className="font-bold text-blue-600">{s.points}P</span>
-                  <span className="font-black">{s.goals * 3 + s.points}</span>
-                </div>
-              ))}
-            </div>
-          );
-        })()}
+        {topScorers.length > 0 && (
+          <div className="mt-3">
+            <p className={`text-sm font-semibold mb-2 ${rainMode ? 'text-rain-md' : ''}`}>Top Scorers</p>
+            {topScorers.map((s, idx) => (
+              <div key={idx} className="flex items-center gap-2 text-xs py-1.5 border-b border-gray-200">
+                <span className="font-bold w-6">#{idx + 1}</span>
+                <span className={`w-16 px-1.5 rounded text-xs font-medium ${s.team === 'home' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
+                  {s.team === 'home' ? match.teamHome.shortCode || match.teamHome.name.substring(0, 3).toUpperCase() : match.teamAway.shortCode || match.teamAway.name.substring(0, 3).toUpperCase()}
+                </span>
+                <span className="flex-1 truncate">
+                  {s.player.name || `Player ${s.index + 1}`}
+                </span>
+                <span className="font-bold text-green-600">{s.stats.goals}G</span>
+                <span className="font-bold text-blue-600">{s.stats.points}P</span>
+                <span className="font-black">{s.stats.goals * 3 + s.stats.points}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* UR-053: GAA Numbering Display */}
+      {/* GAA Numbering Display */}
       <p className={`mt-4 text-center text-xs text-gray-400 ${rainMode ? 'text-sm' : ''}`}>
         GAA numbering: 1-15 starters, 16+ substitutes • Tap player numbers to view detailed stats
       </p>

@@ -20,6 +20,17 @@ export interface TeamData {
   players: PlayerLineup[];
 }
 
+/** A saved team sheet that can be loaded for a new match. */
+export interface SavedTeamSheet {
+  id: string;
+  name: string;
+  shortCode?: string;
+  sport?: 'gaelic-football' | 'hurling';
+  players: PlayerLineup[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface PlayerLineup {
   id?: string;
   playerId?: string;
@@ -76,6 +87,7 @@ class MatchDayDatabase extends Dexie {
   events!: Table<MatchEvent, string>;
   syncQueue!: Table<SyncQueueItem, string>;
   stats!: Table<MatchStats, string>;
+  teamsheets!: Table<SavedTeamSheet, string>;
 
   constructor() {
     super('MatchDayDB');
@@ -85,6 +97,14 @@ class MatchDayDatabase extends Dexie {
       events: 'id, matchId, minute, half, type, timestamp',
       syncQueue: 'id, type, action, createdAt, syncedAt, priority',
       stats: 'id'
+    });
+
+    this.version(2).stores({
+      matches: 'id, status, createdAt, updatedAt',
+      events: 'id, matchId, minute, half, type, timestamp',
+      syncQueue: 'id, type, action, createdAt, syncedAt, priority',
+      stats: 'id',
+      teamsheets: 'id, name, createdAt, updatedAt'
     });
   }
 }
@@ -176,4 +196,33 @@ export async function initDB(): Promise<void> {
   } catch (error) {
     console.error('❌ Failed to initialize DB:', error);
   }
+}
+
+// ─── Team Sheet CRUD ──────────────────────────────────────────────
+
+export async function saveTeamSheet(sheet: Omit<SavedTeamSheet, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  const id = crypto.randomUUID();
+  await db.teamsheets.add({
+    ...sheet,
+    id,
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  });
+  return id;
+}
+
+export async function getAllTeamSheets(): Promise<SavedTeamSheet[]> {
+  return await db.teamsheets.orderBy('createdAt').reverse().toArray();
+}
+
+export async function getTeamSheet(id: string): Promise<SavedTeamSheet | undefined> {
+  return await db.teamsheets.get(id);
+}
+
+export async function deleteTeamSheet(id: string): Promise<void> {
+  await db.teamsheets.delete(id);
+}
+
+export async function updateTeamSheetName(id: string, name: string): Promise<void> {
+  await db.teamsheets.update(id, { name, updatedAt: Date.now() });
 }

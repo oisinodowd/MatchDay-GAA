@@ -6,12 +6,95 @@ export type MatchStatus = 'draft' | 'first-half' | 'halftime' | 'second-half' | 
 export type SportType = 'gaelic-football' | 'hurling';
 export type EventTypes = 'score' | 'yellow_card' | 'black_card' | 'red_card' | 'substitution' | 'note' | 'free_taken' | 'point_wide' | 'goal_wide';
 
+/**
+ * Validate and sanitize a player object. Returns sanitized player or null if invalid.
+ */
+function validatePlayer(player: Partial<Player>, index: number): Player | null {
+  const name = typeof player.name === 'string' && player.name.trim() ? player.name.trim() : `Player ${index + 1}`;
+  const number = typeof player.number === 'number' && player.number > 0 ? Math.floor(player.number) : index + 1;
+  
+  // Validate photoUrl is a valid base64 string or empty
+  let photoUrl: string | undefined = player.photoUrl;
+  if (photoUrl && !photoUrl.startsWith('data:image/') && !photoUrl.startsWith('http')) {
+    photoUrl = undefined; // Corrupted base64, discard it
+  }
+  
+  return {
+    id: typeof player.id === 'string' ? player.id : undefined,
+    playerId: player.playerId,
+    name,
+    number,
+    position: ['GK', 'DEF', 'MID', 'FWD', 'SUB'].includes(player.position || '') ? player.position : undefined,
+    isStarter: typeof player.isStarter === 'boolean' ? player.isStarter : false,
+    goals: Math.max(0, typeof player.goals === 'number' ? player.goals : 0),
+    points: Math.max(0, typeof player.points === 'number' ? player.points : 0),
+    yellowCards: Math.max(0, typeof player.yellowCards === 'number' ? player.yellowCards : 0),
+    blackCards: Math.max(0, typeof player.blackCards === 'number' ? player.blackCards : 0),
+    redCards: Math.max(0, typeof player.redCards === 'number' ? player.redCards : 0),
+    isSubstituted: typeof player.isSubstituted === 'boolean' ? player.isSubstituted : false,
+    photoUrl,
+  };
+}
+
+/**
+ * Migrate an old match (without players arrays) to the new format.
+ */
+function migrateMatchPlayers(match: Match): Match {
+  const homeTeam = { ...match.teamHome };
+  const awayTeam = { ...match.teamAway };
+  
+  // Generate default players if team has no players array (30 = 15 starters + 15 subs)
+  if (!homeTeam.players || homeTeam.players.length === 0) {
+    homeTeam.players = Array.from({ length: 30 }, (_, i) => ({
+      id: undefined,
+      playerId: undefined,
+      name: `Player ${i + 1}`,
+      number: i + 1,
+      position: i === 0 ? 'GK' : i < 8 ? 'DEF' : i < 12 ? 'MID' : i < 15 ? 'FWD' : 'SUB',
+      isStarter: i < 15,
+      goals: 0,
+      points: 0,
+      yellowCards: 0,
+      blackCards: 0,
+      redCards: 0,
+      isSubstituted: false,
+      photoUrl: undefined,
+    }));
+  } else {
+    // Validate existing players
+    homeTeam.players = homeTeam.players.map((p, i) => validatePlayer(p, i)).filter(Boolean) as Player[];
+  }
+  
+  if (!awayTeam.players || awayTeam.players.length === 0) {
+    awayTeam.players = Array.from({ length: 30 }, (_, i) => ({
+      id: undefined,
+      playerId: undefined,
+      name: `Player ${i + 1}`,
+      number: i + 1,
+      position: i === 0 ? 'GK' : i < 8 ? 'DEF' : i < 12 ? 'MID' : i < 15 ? 'FWD' : 'SUB',
+      isStarter: i < 15,
+      goals: 0,
+      points: 0,
+      yellowCards: 0,
+      blackCards: 0,
+      redCards: 0,
+      isSubstituted: false,
+      photoUrl: undefined,
+    }));
+  } else {
+    awayTeam.players = awayTeam.players.map((p, i) => validatePlayer(p, i)).filter(Boolean) as Player[];
+  }
+  
+  return { ...match, teamHome: homeTeam, teamAway: awayTeam };
+}
+
 export interface Team {
   id?: string;
   name: string;
   shortCode?: string;
   goals: number;
   points: number;
+  players: Player[];
 }
 
 export interface Player {
@@ -27,6 +110,7 @@ export interface Player {
   blackCards: number;
   redCards: number;
   isSubstituted: boolean;
+  photoUrl?: string;
 }
 
 export interface MatchEvent {
@@ -34,6 +118,7 @@ export interface MatchEvent {
   type: EventTypes;
   teamSide: 'home' | 'away';
   playerIndex?: number;
+  playerId?: string;
   minute: number;
   half: 'first-half' | 'second-half' | 'extra-time-1' | 'extra-time-2';
   details?: {
@@ -41,6 +126,8 @@ export interface MatchEvent {
     isTwoPoint?: boolean;
     cardType?: 'yellow' | 'black' | 'red';
     playerOutIndex?: number;
+    playerOnName?: string;
+    playerOnNumber?: number;
     locationX?: number; // 0-100 percentage on pitch width
     locationY?: number; // 0-100 percentage on pitch height
   };
@@ -70,6 +157,11 @@ interface MatchState {
   startMatch: () => void;
   endHalf: () => void;
   completeMatch: () => void;
+  
+  // Player Management
+  updateTeamPlayers: (teamSide: 'home' | 'away', players: Player[]) => void;
+  updatePlayerStats: (teamSide: 'home' | 'away', playerIndex: number, updates: Partial<Player>) => void;
+  updatePlayerByName: (teamSide: 'home' | 'away', playerName: string, updates: Partial<Player>) => void;
   
   // Scoring
   addScore: (teamSide: 'home' | 'away', subtype: 'goal' | 'point' | 'free' | '65-meter' | '40m-point', playerIndex?: number, isTwoPoint?: boolean, locationX?: number, locationY?: number) => void;
@@ -102,9 +194,28 @@ export const useMatchStore = create<MatchState>()(
       isMatchActive: false,
 
       createMatch: (homeTeam: Team, awayTeam: Team, sport: SportType) => {
+        // Validate teams have players arrays
+        const validatedHomePlayers = homeTeam.players && homeTeam.players.length > 0 
+          ? homeTeam.players.map((p, i) => validatePlayer(p, i)).filter(Boolean) as Player[]
+          : Array.from({ length: 21 }, (_, i) => ({
+              id: undefined, playerId: undefined, name: `Player ${i + 1}`, number: i + 1,
+              position: i === 0 ? 'GK' : i < 8 ? 'DEF' : i < 12 ? 'MID' : i < 15 ? 'FWD' : 'SUB',
+              isStarter: i < 15, goals: 0, points: 0, yellowCards: 0, blackCards: 0, redCards: 0,
+              isSubstituted: false, photoUrl: undefined,
+            }));
+
+        const validatedAwayPlayers = awayTeam.players && awayTeam.players.length > 0 
+          ? awayTeam.players.map((p, i) => validatePlayer(p, i)).filter(Boolean) as Player[]
+          : Array.from({ length: 21 }, (_, i) => ({
+              id: undefined, playerId: undefined, name: `Player ${i + 1}`, number: i + 1,
+              position: i === 0 ? 'GK' : i < 8 ? 'DEF' : i < 12 ? 'MID' : i < 15 ? 'FWD' : 'SUB',
+              isStarter: i < 15, goals: 0, points: 0, yellowCards: 0, blackCards: 0, redCards: 0,
+              isSubstituted: false, photoUrl: undefined,
+            }));
+
         const newMatch: Match = {
-          teamHome: { ...homeTeam, goals: 0, points: 0 },
-          teamAway: { ...awayTeam, goals: 0, points: 0 },
+          teamHome: { ...homeTeam, goals: 0, points: 0, players: validatedHomePlayers },
+          teamAway: { ...awayTeam, goals: 0, points: 0, players: validatedAwayPlayers },
           sport,
           status: 'draft',
           halfDuration: 30,
@@ -114,6 +225,64 @@ export const useMatchStore = create<MatchState>()(
         };
         
         set({ match: newMatch, isMatchActive: false });
+      },
+
+      updateTeamPlayers: (teamSide: 'home' | 'away', players: Player[]) => {
+        set((state) => {
+          if (!state.match) return state;
+          
+          const newMatch = { ...state.match };
+          if (teamSide === 'home') {
+            newMatch.teamHome = { ...newMatch.teamHome, players };
+          } else {
+            newMatch.teamAway = { ...newMatch.teamAway, players };
+          }
+          
+          return { match: newMatch };
+        });
+      },
+
+      updatePlayerStats: (teamSide: 'home' | 'away', playerIndex: number, updates: Partial<Player>) => {
+        set((state) => {
+          if (!state.match) return state;
+          
+          const newMatch = { ...state.match };
+          const players = [...(teamSide === 'home' ? newMatch.teamHome.players : newMatch.teamAway.players)];
+          
+          if (players[playerIndex]) {
+            players[playerIndex] = { ...players[playerIndex], ...updates };
+          }
+          
+          if (teamSide === 'home') {
+            newMatch.teamHome = { ...newMatch.teamHome, players };
+          } else {
+            newMatch.teamAway = { ...newMatch.teamAway, players };
+          }
+          
+          return { match: newMatch };
+        });
+      },
+
+      updatePlayerByName: (teamSide: 'home' | 'away', playerName: string, updates: Partial<Player>) => {
+        set((state) => {
+          if (!state.match) return state;
+          
+          const newMatch = { ...state.match };
+          const players = [...(teamSide === 'home' ? newMatch.teamHome.players : newMatch.teamAway.players)];
+          const index = players.findIndex(p => p.name.toLowerCase() === playerName.toLowerCase());
+          
+          if (index !== -1) {
+            players[index] = { ...players[index], ...updates };
+          }
+          
+          if (teamSide === 'home') {
+            newMatch.teamHome = { ...newMatch.teamHome, players };
+          } else {
+            newMatch.teamAway = { ...newMatch.teamAway, players };
+          }
+          
+          return { match: newMatch };
+        });
       },
 
       startMatch: () => {
@@ -162,25 +331,40 @@ export const useMatchStore = create<MatchState>()(
           const homeTeam = { ...newMatch.teamHome };
           const awayTeam = { ...newMatch.teamAway };
           
-          // Update scores based on subtype
+          // Validate playerIndex is within bounds before updating player stats
+          const players = teamSide === 'home' ? [...homeTeam.players] : [...awayTeam.players];
+          const validPlayerIndex = playerIndex !== undefined && playerIndex >= 0 && playerIndex < players.length 
+            ? playerIndex 
+            : undefined;
+          
+          // Update team scores
           if (subtype === 'goal') {
             if (teamSide === 'home') homeTeam.goals++;
             else awayTeam.goals++;
           } else {
-            // Points (including 40m two-point scores)
             const pointsValue = isTwoPoint ? 2 : 1;
             if (teamSide === 'home') homeTeam.points += pointsValue;
             else awayTeam.points += pointsValue;
           }
           
+          // Update player stats if valid playerIndex provided
+          if (validPlayerIndex !== undefined) {
+            if (subtype === 'goal') {
+              players[validPlayerIndex].goals++;
+            } else {
+              players[validPlayerIndex].points += isTwoPoint ? 2 : 1;
+            }
+            if (teamSide === 'home') homeTeam.players = players;
+            else awayTeam.players = players;
+          }
+          
           newMatch.teamHome = homeTeam;
           newMatch.teamAway = awayTeam;
           
-          // Add event with location data
           const event: MatchEvent = {
             type: 'score',
             teamSide,
-            playerIndex,
+            playerIndex: validPlayerIndex,
             minute: newMatch.currentMinute,
             half: newMatch.currentHalf,
             details: { 
@@ -203,8 +387,25 @@ export const useMatchStore = create<MatchState>()(
           if (!state.match) return state;
           
           const newMatch = { ...state.match };
+          const homeTeam = { ...newMatch.teamHome };
+          const awayTeam = { ...newMatch.teamAway };
           
-          // This is a simplified version - in reality you'd need proper player arrays
+          // Validate playerIndex is within bounds
+          const players = teamSide === 'home' ? [...homeTeam.players] : [...awayTeam.players];
+          if (playerIndex >= 0 && playerIndex < players.length) {
+            if (cardType === 'yellow') players[playerIndex].yellowCards++;
+            else if (cardType === 'black') players[playerIndex].blackCards++;
+            else players[playerIndex].redCards++;
+            
+            if (teamSide === 'home') homeTeam.players = players;
+            else awayTeam.players = players;
+          } else {
+            console.warn(`[matchday-gaa] addCard: playerIndex ${playerIndex} out of bounds for ${teamSide} team`);
+          }
+          
+          newMatch.teamHome = homeTeam;
+          newMatch.teamAway = awayTeam;
+          
           const event: MatchEvent = {
             type: cardType === 'yellow' ? 'yellow_card' : cardType === 'black' ? 'black_card' : 'red_card',
             teamSide,
@@ -226,6 +427,46 @@ export const useMatchStore = create<MatchState>()(
           if (!state.match) return state;
           
           const newMatch = { ...state.match };
+          const homeTeam = { ...newMatch.teamHome };
+          const awayTeam = { ...newMatch.teamAway };
+          const players = teamSide === 'home' ? [...homeTeam.players] : [...awayTeam.players];
+          
+          // Validate playerOutIndex is within bounds
+          if (playerOutIndex < 0 || playerOutIndex >= players.length) {
+            console.warn(`[matchday-gaa] substitutePlayer: playerOutIndex ${playerOutIndex} out of bounds for ${teamSide} team`);
+            return { match: newMatch };
+          }
+          
+          // Mark outgoing player as substituted
+          if (players[playerOutIndex]) {
+            players[playerOutIndex].isSubstituted = true;
+          }
+          
+          // Find or create the incoming player on the bench
+          const existingSubIndex = players.findIndex(p => p.number === playerOnNumber && !p.isStarter && !p.isSubstituted);
+          if (existingSubIndex !== -1) {
+            players[existingSubIndex].isStarter = true;
+          } else {
+            // Add new player to roster
+            players.push({
+              name: playerOnName,
+              number: playerOnNumber,
+              position: 'SUB',
+              isStarter: true,
+              goals: 0,
+              points: 0,
+              yellowCards: 0,
+              blackCards: 0,
+              redCards: 0,
+              isSubstituted: false,
+            });
+          }
+          
+          if (teamSide === 'home') homeTeam.players = players;
+          else awayTeam.players = players;
+          
+          newMatch.teamHome = homeTeam;
+          newMatch.teamAway = awayTeam;
           
           const event: MatchEvent = {
             type: 'substitution',
@@ -233,7 +474,7 @@ export const useMatchStore = create<MatchState>()(
             playerIndex: playerOutIndex,
             minute: newMatch.currentMinute,
             half: newMatch.currentHalf,
-            details: { playerOutIndex }
+            details: { playerOutIndex, playerOnName, playerOnNumber }
           };
           
           newMatch.events = [...newMatch.events, event];
@@ -253,8 +494,8 @@ export const useMatchStore = create<MatchState>()(
           if (!state.match) return state;
           
           const newMatch = { ...state.match };
-          const homeTeam = { ...newMatch.teamHome };
-          const awayTeam = { ...newMatch.teamAway };
+          let homeTeam = { ...newMatch.teamHome };
+          let awayTeam = { ...newMatch.teamAway };
           
           // Reverse the event
           if (lastEvent.type === 'score') {
@@ -266,6 +507,44 @@ export const useMatchStore = create<MatchState>()(
               if (lastEvent.teamSide === 'home') homeTeam.points -= pointsValue;
               else awayTeam.points -= pointsValue;
             }
+            
+            // Reverse player stats
+            if (lastEvent.playerIndex !== undefined) {
+              const players = lastEvent.teamSide === 'home' ? [...homeTeam.players] : [...awayTeam.players];
+              if (players[lastEvent.playerIndex]) {
+                if (lastEvent.details?.subtype === 'goal') {
+                  players[lastEvent.playerIndex].goals--;
+                } else {
+                  players[lastEvent.playerIndex].points -= lastEvent.details?.isTwoPoint ? 2 : 1;
+                }
+                if (lastEvent.teamSide === 'home') homeTeam.players = players;
+                else awayTeam.players = players;
+              }
+            }
+          } else if (['yellow_card', 'black_card', 'red_card'].includes(lastEvent.type)) {
+            // Reverse card stats
+            if (lastEvent.playerIndex !== undefined) {
+              const players = lastEvent.teamSide === 'home' ? [...homeTeam.players] : [...awayTeam.players];
+              if (players[lastEvent.playerIndex]) {
+                if (lastEvent.details?.cardType === 'yellow') players[lastEvent.playerIndex].yellowCards--;
+                else if (lastEvent.details?.cardType === 'black') players[lastEvent.playerIndex].blackCards--;
+                else players[lastEvent.playerIndex].redCards--;
+                if (lastEvent.teamSide === 'home') homeTeam.players = players;
+                else awayTeam.players = players;
+              }
+            }
+          } else if (lastEvent.type === 'substitution' && lastEvent.details?.playerOnName !== undefined) {
+            // Reverse substitution - mark incoming player as sub again, outgoing as not substituted
+            const players = lastEvent.teamSide === 'home' ? [...homeTeam.players] : [...awayTeam.players];
+            const incomingIndex = players.findIndex(p => p.name.toLowerCase() === lastEvent.details!.playerOnName!.toLowerCase());
+            if (incomingIndex !== -1) {
+              players[incomingIndex].isStarter = false;
+            }
+            if (lastEvent.playerIndex !== undefined && players[lastEvent.playerIndex]) {
+              players[lastEvent.playerIndex].isSubstituted = false;
+            }
+            if (lastEvent.teamSide === 'home') homeTeam.players = players;
+            else awayTeam.players = players;
           }
           
           newMatch.teamHome = homeTeam;
@@ -319,6 +598,18 @@ export const useMatchStore = create<MatchState>()(
     }),
     {
       name: 'matchday-match-storage',
+      version: 2, // Incremented to trigger migration from v1 (no players) to v2 (with players)
+      migrate: (persistedState: unknown, _version: number) => {
+        // Migrate from v1 (no players arrays) to v2 (with players arrays)
+        if (typeof persistedState === 'object' && persistedState !== null) {
+          const state = persistedState as Record<string, unknown>;
+          if (state.match && typeof state.match === 'object') {
+            const match = state.match as Match;
+            return migrateMatchPlayers(match);
+          }
+        }
+        return persistedState;
+      },
       partialize: (state) => ({ 
         match: state.match,
         isMatchActive: state.isMatchActive 

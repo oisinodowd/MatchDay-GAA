@@ -64,12 +64,11 @@ export default function Scoreboard() {
         <div className="flex items-center justify-between gap-2">
           {/* Home Team */}
           <div className={`flex flex-col items-start ${homeLeading && !rainMode ? 'scale-105' : ''} transition-transform`}>
-            <span className={`${rainMode ? 'text-rain-md' : 'text-xs'} font-bold text-white truncate max-w-[40%]`}>
+            <span className={`${rainMode ? 'text-rain-md' : 'text-xs'} font-semibold text-white truncate max-w-[40%]`}>
               {homeTeam.name || 'HOME'}
             </span>
             <div className="flex items-baseline gap-1">
-              <span className={`${rainMode ? 'text-rain-xl' : 'text-lg'} font-black text-gaa-gold tabular-nums`}>
-                {homeNotation}
+              <span className={`${rainMode ? 'text-rain-xl' : 'text-lg'} font-bold text-gaa-gold tabular-nums`}>                {homeNotation}
               </span>
               {!rainMode && (
                 <span className="text-[10px] text-green-200">({homeTotal})</span>
@@ -79,7 +78,7 @@ export default function Scoreboard() {
 
           {/* Match Status / Time */}
           <div className="flex flex-col items-center">
-            <span className={`${rainMode ? 'text-rain-md' : 'text-sm'} font-bold text-white tabular-nums`}>
+            <span className={`${rainMode ? 'text-rain-md' : 'text-sm'} font-semibold text-white tabular-nums`}>
               {getStatusText()}
             </span>
             {!rainMode && (
@@ -92,11 +91,11 @@ export default function Scoreboard() {
 
           {/* Away Team */}
           <div className={`flex flex-col items-end ${awayLeading && !rainMode ? 'scale-105' : ''} transition-transform`}>
-            <span className={`${rainMode ? 'text-rain-md' : 'text-xs'} font-bold text-white truncate max-w-[40%]`}>
+            <span className={`${rainMode ? 'text-rain-md' : 'text-xs'} font-semibold text-white truncate max-w-[40%]`}>
               {awayTeam.name || 'AWAY'}
             </span>
             <div className="flex items-baseline gap-1">
-              <span className={`${rainMode ? 'text-rain-xl' : 'text-lg'} font-black text-gaa-gold tabular-nums`}>
+              <span className={`${rainMode ? 'text-rain-xl' : 'text-lg'} font-bold text-gaa-gold tabular-nums`}>
                 {awayNotation}
               </span>
               {!rainMode && (

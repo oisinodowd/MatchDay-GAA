@@ -20,7 +20,6 @@ export default function OfficialsPage() {
   const accessibilityMode = useSettingsStore((s) => s.accessibilityMode);
 
   const rainMode = accessibilityMode === 'rain-mode';
-  const highContrast = accessibilityMode === 'high-contrast';
   const largeText = accessibilityMode === 'large-text';
 
   const [officials, setOfficials] = useState<MatchOfficialsData>({
@@ -56,7 +55,7 @@ export default function OfficialsPage() {
     alert('Officials saved successfully!');
   };
 
-  const inputClass = `w-full rounded-lg border-2 p-3 font-medium ${highContrast ? 'border-black text-lg' : ''} ${rainMode ? 'text-rain-md py-4' : ''}`;
+  const inputClass = `w-full rounded-lg border-2 p-3 font-medium ${rainMode ? 'text-rain-md py-4' : ''}`;
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
@@ -71,7 +70,7 @@ export default function OfficialsPage() {
       </h1>
 
       {/* Match Info */}
-      <div className={`mb-6 rounded-xl border-2 p-4 ${highContrast ? 'border-black' : 'border-gray-300'}`}>
+      <div className="mb-6 rounded-xl border-2 p-4 border-gray-300">
         <div className="flex items-center justify-between">
           <div>
             <p className={`${largeText ? 'text-lg' : 'text-sm'} text-gray-500`}>Match</p>
@@ -164,7 +163,7 @@ export default function OfficialsPage() {
             officials.referee.trim()
               ? 'bg-gaa-green hover:bg-green-700 active:scale-[0.98]'
               : 'bg-gray-400 cursor-not-allowed'
-          } ${rainMode ? 'text-rain-lg py-5' : ''} ${highContrast ? 'border-2 border-black' : ''}`}
+          } ${rainMode ? 'text-rain-lg py-5' : ''}`}
         >
           <Save className="w-5 h-5" />
           Save Officials

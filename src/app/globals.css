@@ -1,30 +1,167 @@
 @import "tailwindcss";
 
+/* ============================================================
+   Design Tokens — Professional Color System
+   ============================================================ */
 :root {
-  --background: #ffffff;
-  --foreground: #1a1a1a;
-  --card-background: #f9fafb;
-  --card-border: #e5e7eb;
+  /* Core palette */
+  --background: #fafbfc;
+  --foreground: #1a202c;
+  
+  /* Card surfaces with subtle depth */
+  --card-background: #ffffff;
+  --card-border: rgba(0, 0, 0, 0.06);
+  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --card-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+  
+  /* GAA brand colors — refined for professionalism */
+  --gaa-green: #1B5E20;
+  --gaa-green-light: #2E7D32;
+  --gaa-green-muted: #E8F5E9;
+  --gaa-gold: #C6A000; /* Slightly darker for better contrast */
+  
+  /* Semantic colors */
+  --color-blue-50: #EFF6FF;
+  --color-blue-100: #DBEAFE;
+  --color-blue-600: #2563EB;
+  --color-orange-50: #FFF7ED;
+  --color-orange-100: #FFEDD5;
+  --color-orange-600: #EA580C;
+  --color-red-50: #FEF2F2;
+  --color-red-100: #FEE2E2;
+  --color-purple-50: #FAF5FF;
+  --color-purple-100: #F3E8FF;
+  
+  /* Typography scale */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --card-background: #1f1f1f;
-    --card-border: #374151;
+    --background: #0f172a;
+    --foreground: #e2e8f0;
+    --card-background: #1e293b;
+    --card-border: rgba(255, 255, 255, 0.08);
+    --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+    --card-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3);
   }
 }
 
+/* ============================================================
+   Base Styles
+   ============================================================ */
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  line-height: 1.6;
 }
 
-/* Rain Mode - High visibility in wet conditions */
+/* ============================================================
+   Card Elevation System — subtle shadows instead of heavy borders
+   ============================================================ */
+.card-elevated {
+  background: var(--card-background);
+  border-radius: 0.75rem;
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--card-border);
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.card-elevated:hover {
+  box-shadow: var(--card-shadow-hover);
+}
+
+/* ============================================================
+   Button System — consistent states with focus rings
+   ============================================================ */
+.btn-primary {
+  background-color: var(--gaa-green);
+  color: #ffffff;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  padding: 0.875rem 1.5rem;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--gaa-green-light);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-primary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(27, 94, 32, 0.4);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ============================================================
+   Input System — consistent styling
+   ============================================================ */
+.input-field {
+  width: 100%;
+  border-radius: 0.625rem;
+  border: 1px solid var(--card-border);
+  padding: 0.75rem 1rem;
+  background: var(--card-background);
+  color: var(--foreground);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--gaa-green);
+  box-shadow: 0 0 0 3px rgba(27, 94, 32, 0.15);
+}
+
+.input-field::placeholder {
+  color: #9ca3af;
+}
+
+/* ============================================================
+   Score Display — professional tabular numbers
+   ============================================================ */
+.score-display {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* Touch-friendly buttons for pitch-side use */
+.btn-touch {
+  min-height: 48px;
+  min-width: 48px;
+  padding: 12px 24px;
+}
+
+/* ============================================================
+   GAA Theme Colors (utility classes)
+   ============================================================ */
+.bg-gaa-green { background-color: var(--gaa-green); }
+.bg-gaa-green-light { background-color: var(--gaa-green-light); }
+.bg-gaa-green-muted { background-color: var(--gaa-green-muted); }
+.bg-gaa-gold { background-color: var(--gaa-gold); }
+.text-gaa-green { color: var(--gaa-green); }
+.text-gaa-gold { color: var(--gaa-gold); }
+
+/* ============================================================
+   Rain Mode - High visibility in wet conditions (UR-079)
+   ============================================================ */
 .rain-mode {
   background-color: #000000 !important;
   color: #00ff00 !important;
@@ -41,7 +178,40 @@ body {
   text-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00;
 }
 
-/* High Contrast Mode */
+/* Enhanced Rain Mode — 60px touch targets, large fonts */
+.rain-mode * {
+  min-height: 60px !important;
+  min-width: 60px !important;
+  font-size: 18px !important;
+  transition: none !important;
+}
+
+.rain-mode button,
+.rain-mode [role="button"],
+.rain-mode input,
+.rain-mode select {
+  padding: 16px 24px !important;
+  font-size: 20px !important;
+  border-radius: 12px !important;
+  min-height: 60px !important;
+}
+
+.rain-mode .scoreboard-score {
+  font-size: 48px !important;
+  line-height: 1 !important;
+}
+
+/* ============================================================
+   High Contrast Mode (UR-080) — WCAG AAA compliance
+   ============================================================ */
+.high-contrast {
+  --background: 0 0% 100%;
+  --foreground: 0 0% 0%;
+  --primary: 0 0% 0%;
+  --secondary: 0 0% 20%;
+  --border: 0 0% 0%;
+}
+
 .high-contrast {
   background-color: #000000 !important;
   color: #ffffff !important;
@@ -50,6 +220,7 @@ body {
 .high-contrast * {
   border-width: 2px !important;
   border-color: #ffffff !important;
+  background-image: none !important;
 }
 
 .high-contrast button,
@@ -59,7 +230,18 @@ body {
   font-weight: bold !important;
 }
 
-/* Large Text Mode */
+.high-contrast .bg-gaa-green {
+  background-color: #000 !important;
+  color: #FFF !important;
+}
+
+.high-contrast .text-gaa-green {
+  color: #000 !important;
+}
+
+/* ============================================================
+   Large Text Mode
+   ============================================================ */
 .large-text {
   font-size: 125% !important;
 }
@@ -71,33 +253,25 @@ body {
   font-size: 1.5rem !important;
 }
 
-/* Score Display */
-.score-display {
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.05em;
-}
-
-/* Touch-friendly buttons for pitch-side use */
-.btn-touch {
-  min-height: 48px;
-  min-width: 48px;
-  padding: 12px 24px;
-}
-
-/* GAA Theme Colors */
-.bg-gaa-green { background-color: #1B5E20; }
-.bg-gaa-green-light { background-color: #2E7D32; }
-.bg-gaa-gold { background-color: #FFD700; }
-.text-gaa-green { color: #1B5E20; }
-.text-gaa-gold { color: #FFD700; }
-
-/* Pitch-side optimized - large touch targets */
+/* ============================================================
+   Pitch-side optimized - large touch targets
+   ============================================================ */
 .pitch-mode .touch-target {
   min-height: 72px;
   min-width: 72px;
 }
 
-/* Animation for new events */
+/* ============================================================
+   Subtle animation for new events
+   ============================================================ */
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.25s ease-out;
+}
 @keyframes slideIn {
   from {
     transform: translateX(-100%);

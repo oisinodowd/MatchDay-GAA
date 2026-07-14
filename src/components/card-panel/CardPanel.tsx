@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useMatchStore } from '@/stores/match-store';
 import { useSettingsStore } from '@/stores/settings-store';
 import { AlertTriangle, ShieldAlert, XCircle } from 'lucide-react';
@@ -39,18 +39,26 @@ export default function CardPanel({ teamSide, teamName }: CardPanelProps) {
   const accessibilityMode = useSettingsStore((s) => s.accessibilityMode);
 
   const rainMode = accessibilityMode === 'rain-mode';
-  const highContrast = accessibilityMode === 'high-contrast';
 
   const [selectedPlayer, setSelectedPlayer] = useState<string>('');
   const [cardReason, setCardReason] = useState('');
 
-  // Mock player list — in production this comes from match_players table
-  const players = Array.from({ length: 21 }, (_, i) => ({
-    id: `p${i + 1}`,
-    name: `Player ${i + 1}`,
-    number: i + 1,
-    isStarter: i < 15,
-  }));
+  // Get real team players from match store
+  const players = useMemo(() => {
+    if (!match) return [];
+    const team = teamSide === 'home' ? match.teamHome : match.teamAway;
+    return team.players || [];
+  }, [match, teamSide]);
+
+  // Fallback to mock players if no real players exist (for backward compatibility)
+  const displayPlayers = players.length > 0 
+    ? players 
+    : Array.from({ length: 21 }, (_, i) => ({
+        id: `p${i + 1}`,
+        name: `Player ${i + 1}`,
+        number: i + 1,
+        isStarter: i < 15,
+      }));
 
   const handleIssueCard = (type: CardType) => {
     if (!selectedPlayer) return;
@@ -74,7 +82,7 @@ export default function CardPanel({ teamSide, teamName }: CardPanelProps) {
   };
 
   return (
-    <div className={`rounded-xl border p-4 ${rainMode ? 'p-6' : ''} ${highContrast ? 'border-2 border-black' : ''}`}>
+    <div className="rounded-xl border p-4">
       {/* Team Header */}
       <h3 className={`mb-3 font-bold text-gaa-green ${rainMode ? 'text-rain-md' : ''}`}>
         {teamName} ({teamSide === 'home' ? 'HOME' : 'AWAY'}) — Cards
@@ -91,9 +99,9 @@ export default function CardPanel({ teamSide, teamName }: CardPanelProps) {
           className={`w-full rounded-lg border p-2 ${rainMode ? 'min-h-[60px] text-xl' : ''}`}
         >
           <option value="">— Tap a player —</option>
-          {players.map((p) => (
-            <option key={p.id} value={p.id}>
-              #{p.number} {p.name} {p.isStarter ? '(S)' : '(Sub)'}
+          {displayPlayers.map((p, idx) => (
+            <option key={p.id || `p${idx + 1}`} value={p.id || `p${idx + 1}`}>
+              #{p.number} {p.name || `Player ${idx + 1}`} {p.isStarter ? '(S)' : '(Sub)'}
             </option>
           ))}
         </select>

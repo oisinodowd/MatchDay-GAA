@@ -12,7 +12,6 @@ export default function ReportsPage() {
   const accessibilityMode = useSettingsStore((s) => s.accessibilityMode);
 
   const rainMode = accessibilityMode === 'rain-mode';
-  const highContrast = accessibilityMode === 'high-contrast';
   const largeText = accessibilityMode === 'large-text';
 
   // Generate AI narrative if match exists and has events
@@ -45,7 +44,7 @@ export default function ReportsPage() {
 
       {/* AI Match Narrative — UR-026, UR-067–70 */}
       {narrative && (
-        <div className={`mb-6 rounded-xl border-2 p-4 ${highContrast ? 'border-black' : 'border-purple-300'} bg-purple-50`}>
+        <div className="mb-6 rounded-xl border-2 p-4 border-purple-300 bg-purple-50">
           <div className="flex items-center gap-2 mb-3">
             <Sparkles className="w-5 h-5 text-purple-600" />
             <h2 className={`font-bold ${rainMode ? 'text-rain-md' : ''}`}>AI Match Narrative</h2>

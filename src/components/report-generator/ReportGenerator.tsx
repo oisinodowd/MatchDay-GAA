@@ -11,12 +11,11 @@ export default function ReportGenerator() {
   const accessibilityMode = useSettingsStore((s) => s.accessibilityMode);
 
   const rainMode = accessibilityMode === 'rain-mode';
-  const highContrast = accessibilityMode === 'high-contrast';
   const largeText = accessibilityMode === 'large-text';
 
   if (!match) {
     return (
-      <div className={`rounded-xl border-2 p-4 text-center ${highContrast ? 'border-black' : 'border-gray-300'}`}>
+      <div className="rounded-xl border-2 p-4 text-center border-gray-300">
         <p className="text-gray-500">Start a match to generate reports.</p>
       </div>
     );
@@ -159,7 +158,7 @@ export default function ReportGenerator() {
   ];
 
   return (
-    <div className={`rounded-xl border-2 p-4 ${highContrast ? 'border-black' : 'border-gray-300'} ${rainMode ? 'bg-rain-bg p-6' : ''}`}>
+    <div className="rounded-xl border-2 p-4 border-gray-300">
       <h3 className={`${largeText ? 'text-xl' : 'text-lg'} font-bold text-gaa-green mb-4`}>
         Generate Report
       </h3>
@@ -180,7 +179,7 @@ export default function ReportGenerator() {
           <button
             key={format}
             onClick={() => shareReport(format)}
-            className={`flex flex-col items-center gap-2 rounded-lg border-2 p-3 transition-all ${highContrast ? 'border-black hover:bg-gray-100' : 'border-gray-200 hover:border-gaa-green hover:bg-green-50'}`}
+            className="flex flex-col items-center gap-2 rounded-lg border-2 p-3 transition-all border-gray-200 hover:border-gaa-green hover:bg-green-50"
           >
             <span className="text-gaa-green">{icon}</span>
             <span className={`font-bold text-gray-900 ${largeText ? 'text-base' : ''}`}>{label}</span>

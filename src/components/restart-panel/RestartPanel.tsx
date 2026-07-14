@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useMatchStore } from '@/stores/match-store';
 import { useSettingsStore } from '@/stores/settings-store';
 import { RefreshCw, Target, Shield } from 'lucide-react';
@@ -18,19 +18,36 @@ export default function RestartPanel({ teamSide }: RestartPanelProps) {
   const accessibilityMode = useSettingsStore((s) => s.accessibilityMode);
 
   const rainMode = accessibilityMode === 'rain-mode';
-  const highContrast = accessibilityMode === 'high-contrast';
   const largeText = accessibilityMode === 'large-text';
 
   const [selectedRestart, setSelectedRestart] = useState<RestartType>('kick-out');
   const [playerIndex, setPlayerIndex] = useState<number>(0);
 
-  // Get team players from match state (simplified - using first few players)
-  const team = teamSide === 'home' ? match?.teamHome : match?.teamAway;
-  const playerName = team ? `Player ${playerIndex + 1}` : '';
+  // Get real team players from match state
+  const teamPlayers = useMemo(() => {
+    if (!match) return [];
+    const team = teamSide === 'home' ? match.teamHome : match.teamAway;
+    return team.players || [];
+  }, [match, teamSide]);
+
+  // Use real players or fallback to mock data
+  const displayPlayers = useMemo(() => {
+    if (teamPlayers.length > 0) {
+      return teamPlayers.slice(0, 21);
+    }
+    return Array.from({ length: 21 }, (_, i) => ({
+      id: `p${i + 1}`,
+      name: `Player ${i + 1}`,
+      number: i + 1,
+      isStarter: i < 15,
+    }));
+  }, [teamPlayers]);
+
+  const playerName = displayPlayers[playerIndex]?.name || `Player ${playerIndex + 1}`;
 
   if (!match || match.status === 'draft') {
     return (
-      <div className={`rounded-xl border-2 p-4 text-center ${highContrast ? 'border-black' : 'border-gray-300'}`}>
+      <div className="rounded-xl border-2 p-4 text-center border-gray-300">
         <p className="text-gray-500">Start the match to record restart events.</p>
       </div>
     );
@@ -41,7 +58,7 @@ export default function RestartPanel({ teamSide }: RestartPanelProps) {
     switch (selectedRestart) {
       case 'kick-out':
         // Kick-out is just a note event - no score change
-        console.log(`Kick-out by ${teamSide} player ${playerIndex + 1}`);
+        console.log(`Kick-out by ${teamSide} player ${playerName}`);
         break;
       case '45-meter':
         // 45-meter penalty (Gaelic football) - counts as a point
@@ -86,7 +103,7 @@ export default function RestartPanel({ teamSide }: RestartPanelProps) {
   ];
 
   return (
-    <div className={`rounded-xl border-2 p-4 ${highContrast ? 'border-black' : 'border-gray-300'} ${rainMode ? 'bg-rain-bg p-6' : ''}`}>
+    <div className="rounded-xl border-2 p-4">
       <h3 className={`${largeText ? 'text-xl' : 'text-lg'} font-bold text-gaa-green mb-4`}>
         Restart Events — {teamSide === 'home' ? match.teamHome.name : match.teamAway.name}
       </h3>
@@ -100,8 +117,6 @@ export default function RestartPanel({ teamSide }: RestartPanelProps) {
             className={`flex flex-col items-center gap-2 rounded-lg border-2 p-3 transition-all ${
               selectedRestart === option.type
                 ? 'border-gaa-green bg-green-50 shadow-md'
-                : highContrast
-                ? 'border-black hover:bg-gray-100'
                 : 'border-gray-200 hover:border-gray-300'
             }`}
           >
@@ -124,11 +139,11 @@ export default function RestartPanel({ teamSide }: RestartPanelProps) {
         <select
           value={playerIndex}
           onChange={(e) => setPlayerIndex(Number(e.target.value))}
-          className={`w-full rounded-lg border-2 p-3 font-medium ${highContrast ? 'border-black text-lg' : ''}`}
+          className="w-full rounded-lg border-2 p-3 font-medium"
         >
-          {Array.from({ length: 15 }, (_, i) => (
-            <option key={i} value={i}>
-              Player {i + 1}
+          {displayPlayers.map((p, i) => (
+            <option key={p.id || `p${i + 1}`} value={i}>
+              #{p.number} {p.name || `Player ${i + 1}`} {p.isStarter ? '(S)' : '(Sub)'}
             </option>
           ))}
         </select>
@@ -152,7 +167,7 @@ export default function RestartPanel({ teamSide }: RestartPanelProps) {
           isMatchActive
             ? 'bg-gaa-green hover:bg-green-700 active:scale-[0.98]'
             : 'bg-gray-400 cursor-not-allowed'
-        } ${rainMode ? 'text-rain-lg py-5' : ''} ${highContrast ? 'border-2 border-black' : ''}`}
+        } ${rainMode ? 'text-rain-lg py-5' : ''}`}
       >
         Record {selectedRestart.replace('-', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
       </button>

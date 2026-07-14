@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useMatchStore } from '@/stores/match-store';
+import { useState, useMemo } from 'react';
+import { useMatchStore, Player } from '@/stores/match-store';
 import { useSettingsStore } from '@/stores/settings-store';
 import { Target, Crosshair, Trophy, Square, SquareSlash, ShieldAlert, MapPin } from 'lucide-react';
 import InteractivePitchMap from './InteractivePitchMap';
@@ -18,7 +18,6 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
   const accessibilityMode = useSettingsStore((s) => s.accessibilityMode);
 
   const rainMode = accessibilityMode === 'rain-mode';
-  const highContrast = accessibilityMode === 'high-contrast';
 
   const [selectedPlayer, setSelectedPlayer] = useState<string>('');
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -28,13 +27,23 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
   const [showPitchMap, setShowPitchMap] = useState(false);
   const [pendingLocation, setPendingLocation] = useState<{ x: number; y: number } | null>(null);
 
-  // Mock player list — in production this comes from match_players table
-  const players = Array.from({ length: 21 }, (_, i) => ({
-    id: `p${i + 1}`,
-    name: `Player ${i + 1}`,
-    number: i + 1,
-    isStarter: i < 15,
-  }));
+  // Get real team players from match store
+  const teamPlayers = useMemo(() => {
+    if (!match) return [];
+    const team = teamSide === 'home' ? match.teamHome : match.teamAway;
+    return team.players || [];
+  }, [match, teamSide]);
+
+  // Fallback to mock players if no real players exist (for backward compatibility)
+  const players: Player[] = teamPlayers.length > 0 
+    ? teamPlayers 
+    : Array.from({ length: 21 }, (_, i) => ({
+        id: `p${i + 1}`,
+        name: `Player ${i + 1}`,
+        number: i + 1,
+        isStarter: i < 15,
+        goals: 0, points: 0, yellowCards: 0, blackCards: 0, redCards: 0, isSubstituted: false,
+      }));
 
   const handleScoreClick = (type: 'point' | 'two_point' | 'goal') => {
     if (!selectedPlayer) {
@@ -107,70 +116,70 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
   };
 
   return (
-    <div className={`rounded-xl border p-4 ${rainMode ? 'p-6' : ''} ${highContrast ? 'border-2 border-black' : ''}`}>
+    <div className="card-elevated p-5">
       {/* Team Header */}
-      <h3 className={`mb-3 font-bold text-gaa-green ${rainMode ? 'text-rain-md' : ''}`}>
-        {teamName} ({teamSide === 'home' ? 'HOME' : 'AWAY'})
+      <h3 className={`mb-4 font-semibold ${rainMode ? 'text-rain-md' : 'text-base'} text-gaa-green`}>
+        {teamName} <span className={`font-normal ${'text-gray-500'}`}>• {teamSide === 'home' ? 'Home' : 'Away'}</span>
       </h3>
 
       {/* Player Selector — tap to select, then tap score type (UR-004–5) */}
-      <div className="mb-3">
-        <label className={`block mb-1 text-xs font-semibold ${rainMode ? 'text-rain-md' : ''}`}>
+      <div className="mb-4">
+        <label className={`block mb-1.5 text-xs font-medium ${rainMode ? 'text-rain-sm' : ''} text-gray-600`}>
           Select Player
         </label>
         <select
           value={selectedPlayer}
           onChange={(e) => setSelectedPlayer(e.target.value)}
-          className={`w-full rounded-lg border p-2 ${rainMode ? 'min-h-[60px] text-xl' : ''}`}
+          className={`input-field ${rainMode ? 'min-h-[60px] text-xl' : ''}`}
         >
-          <option value="">— Tap a player —</option>
-          {players.map((p) => (
-            <option key={p.id} value={p.id}>
-              #{p.number} {p.name} {p.isStarter ? '(S)' : '(Sub)'}
+          <option value="">— Select a player —</option>
+          {players.map((p, idx) => (
+            <option key={p.id || idx} value={p.id || `p${idx + 1}`}>
+              #{p.number} {p.name || `Player ${idx + 1}`} {p.isStarter ? '(S)' : '(Sub)'}
             </option>
           ))}
         </select>
       </div>
 
       {/* Score Type Buttons — one tap to record (UR-004–5) */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-3 mb-4">
         {/* Point Button */}
         <button
           onClick={() => { setPendingScore('point'); handleScoreClick('point'); }}
           disabled={!selectedPlayer}
-          className={`flex flex-col items-center justify-center rounded-lg bg-blue-100 py-4 transition ${
-            selectedPlayer ? 'hover:bg-blue-200 active:scale-95' : 'bg-gray-100 cursor-not-allowed'
+          className={`flex flex-col items-center justify-center rounded-xl py-5 transition ${
+            selectedPlayer ? 'hover:bg-blue-100 active:scale-[0.98]' : 'bg-gray-100 cursor-not-allowed'
           } ${rainMode ? 'min-h-[60px]' : ''}`}
         >
-          <Target className={rainMode ? 'w-8 h-8' : 'w-6 h-6'} />
-          <span className={`font-bold ${rainMode ? 'text-lg' : ''}`}>Point</span>
-          <span className="text-xs text-gray-500">+1 pt</span>
+          <Target className={`mb-2 ${selectedPlayer ? 'text-blue-600' : 'text-gray-400'} ${rainMode ? 'w-8 h-8' : 'w-6 h-6'}`} />
+          <span className={`font-semibold ${rainMode ? 'text-base' : 'text-sm'} ${selectedPlayer ? 'text-blue-700' : ''}`}>Point</span>
+          <span className={`mt-1 ${'text-xs'} text-gray-500`}>+1 pt</span>
         </button>
 
         {/* Two-Point Button (2025 rule — UR-034) */}
         <button
           onClick={() => { setPendingScore('two_point'); handleScoreClick('two_point'); }}
           disabled={!selectedPlayer}
-          className={`flex flex-col items-center justify-center rounded-lg bg-orange-100 py-4 transition ${
-            selectedPlayer ? 'hover:bg-orange-200 active:scale-95' : 'bg-gray-100 cursor-not-allowed'
+          className={`flex flex-col items-center justify-center rounded-xl py-5 transition ${
+            selectedPlayer ? 'hover:bg-orange-100 active:scale-[0.98]' : 'bg-gray-100 cursor-not-allowed'
           } ${rainMode ? 'min-h-[60px]' : ''}`}
         >
-          <Crosshair className={rainMode ? 'w-8 h-8' : 'w-6 h-6'} />
-          <span className={`font-bold text-orange-700 ${rainMode ? 'text-lg' : ''}`}>2 Pt</span>
-          <span className="text-xs text-gray-500">Outside 40m arc</span>
+          <Crosshair className={`mb-2 ${selectedPlayer ? 'text-orange-600' : 'text-gray-400'} ${rainMode ? 'w-8 h-8' : 'w-6 h-6'}`} />
+          <span className={`font-semibold ${rainMode ? 'text-base' : 'text-sm'} ${selectedPlayer ? 'text-orange-700' : ''}`}>2 Pt</span>
+          <span className={`mt-1 ${'text-xs'} text-gray-500`}>40m+</span>
         </button>
 
         {/* Goal Button */}
         <button
           onClick={() => { setPendingScore('goal'); handleScoreClick('goal'); }}
           disabled={!selectedPlayer}
-          className={`flex flex-col items-center justify-center rounded-lg bg-green-100 py-4 transition ${
-            selectedPlayer ? 'hover:bg-green-200 active:scale-95' : 'bg-gray-100 cursor-not-allowed'
+          className={`flex flex-col items-center justify-center rounded-xl py-5 transition ${
+            selectedPlayer ? 'hover:bg-green-100 active:scale-[0.98]' : 'bg-gray-100 cursor-not-allowed'
           } ${rainMode ? 'min-h-[60px]' : ''}`}
         >
-          <Trophy className={rainMode ? 'w-8 h-8' : 'w-6 h-6'} />
-          <span className={`font-bold text-green-700 ${rainMode ? 'text-lg' : ''}`}>Goal</span>
-          <span className="text-xs text-gray-500">+3 pts</span>
+          <Trophy className={`mb-2 ${selectedPlayer ? 'text-green-600' : 'text-gray-400'} ${rainMode ? 'w-8 h-8' : 'w-6 h-6'}`} />
+          <span className={`font-semibold ${rainMode ? 'text-base' : 'text-sm'} ${selectedPlayer ? 'text-green-700' : ''}`}>Goal</span>
+          <span className={`mt-1 ${'text-xs'} text-gray-500`}>+3 pts</span>
         </button>
       </div>
 
@@ -187,15 +196,17 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
         onClick={() => {
           addScore(teamSide, 'point', undefined, false);
         }}
-        className={`mt-2 w-full text-center text-xs text-gray-500 underline ${rainMode ? 'text-sm' : ''}`}
+        className={`w-full text-center ${'text-xs'} font-medium ${rainMode ? 'text-rain-sm' : ''} text-gray-500 hover:text-gray-700 underline transition-colors`}
       >
         Score without player (assign later)
       </button>
 
       {/* Discipline Section — Cards (UR-063–71) */}
-      <div className="mt-4 pt-3 border-t">
-        <h4 className={`mb-2 text-xs font-semibold uppercase ${rainMode ? 'text-rain-md' : ''}`}>Discipline</h4>
-        <div className="grid grid-cols-3 gap-2">
+      <div className={`mt-5 pt-4 border-t ${'border-gray-200'}`}>
+        <h4 className={`mb-3 text-xs font-semibold uppercase tracking-wider ${rainMode ? 'text-rain-sm' : ''} text-gray-500`}>
+          Discipline
+        </h4>
+        <div className="grid grid-cols-3 gap-3">
           {/* Yellow Card */}
           <button
             onClick={() => {
@@ -205,13 +216,13 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
               setSelectedPlayer('');
             }}
             disabled={!selectedPlayer}
-            className={`flex flex-col items-center justify-center rounded-lg py-4 transition ${
-              selectedPlayer ? 'hover:bg-yellow-50 active:scale-95' : 'bg-gray-100 cursor-not-allowed'
+            className={`flex flex-col items-center justify-center rounded-xl py-4 transition ${
+              selectedPlayer ? 'hover:bg-yellow-50 active:scale-[0.98]' : 'bg-gray-100 cursor-not-allowed'
             } ${rainMode ? 'min-h-[60px]' : ''}`}
           >
-            <div className="w-8 h-10 bg-yellow-400 rounded border-2 border-black mb-1"></div>
-            <span className={`font-bold text-yellow-700 ${rainMode ? 'text-lg' : ''}`}>Yellow</span>
-            <span className="text-xs text-gray-500">Caution</span>
+            <div className={`w-7 h-10 rounded mb-2 ${selectedPlayer ? 'bg-yellow-400' : 'bg-gray-300'} border-2 border-black`}></div>
+            <span className={`font-semibold text-sm ${rainMode ? 'text-rain-sm' : ''} ${selectedPlayer ? 'text-yellow-700' : ''}`}>Yellow</span>
+            <span className={`mt-0.5 ${'text-xs'} text-gray-500`}>Caution</span>
           </button>
 
           {/* Black Card */}
@@ -223,13 +234,13 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
               setSelectedPlayer('');
             }}
             disabled={!selectedPlayer}
-            className={`flex flex-col items-center justify-center rounded-lg py-4 transition ${
-              selectedPlayer ? 'hover:bg-gray-200 active:scale-95' : 'bg-gray-100 cursor-not-allowed'
+            className={`flex flex-col items-center justify-center rounded-xl py-4 transition ${
+              selectedPlayer ? 'hover:bg-gray-200 active:scale-[0.98]' : 'bg-gray-100 cursor-not-allowed'
             } ${rainMode ? 'min-h-[60px]' : ''}`}
           >
-            <div className="w-8 h-10 bg-black rounded border-2 border-white mb-1"></div>
-            <span className={`font-bold text-gray-700 ${rainMode ? 'text-lg' : ''}`}>Black</span>
-            <span className="text-xs text-gray-500">Send-off</span>
+            <div className={`w-7 h-10 rounded mb-2 ${selectedPlayer ? 'bg-black' : 'bg-gray-300'} border-2 border-white`}></div>
+            <span className={`font-semibold text-sm ${rainMode ? 'text-rain-sm' : ''} ${selectedPlayer ? 'text-gray-700' : ''}`}>Black</span>
+            <span className={`mt-0.5 ${'text-xs'} text-gray-500`}>Send-off</span>
           </button>
 
           {/* Red Card */}
@@ -241,13 +252,13 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
               setSelectedPlayer('');
             }}
             disabled={!selectedPlayer}
-            className={`flex flex-col items-center justify-center rounded-lg py-4 transition ${
-              selectedPlayer ? 'hover:bg-red-50 active:scale-95' : 'bg-gray-100 cursor-not-allowed'
+            className={`flex flex-col items-center justify-center rounded-xl py-4 transition ${
+              selectedPlayer ? 'hover:bg-red-50 active:scale-[0.98]' : 'bg-gray-100 cursor-not-allowed'
             } ${rainMode ? 'min-h-[60px]' : ''}`}
           >
-            <div className="w-8 h-10 bg-red-600 rounded border-2 border-white mb-1"></div>
-            <span className={`font-bold text-red-700 ${rainMode ? 'text-lg' : ''}`}>Red</span>
-            <span className="text-xs text-gray-500">Dismissal</span>
+            <div className={`w-7 h-10 rounded mb-2 ${selectedPlayer ? 'bg-red-600' : 'bg-gray-300'} border-2 border-white`}></div>
+            <span className={`font-semibold text-sm ${rainMode ? 'text-rain-sm' : ''} ${selectedPlayer ? 'text-red-700' : ''}`}>Red</span>
+            <span className={`mt-0.5 ${'text-xs'} text-gray-500`}>Dismissal</span>
           </button>
         </div>
       </div>

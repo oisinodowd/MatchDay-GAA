@@ -1,18 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useMatchStore } from '@/stores/match-store';
+import { useMatchStore, Player, Team } from '@/stores/match-store';
 import { useSettingsStore } from '@/stores/settings-store';
+import { ArrowLeft, Trophy, MapPin, User, Shield, Users, FolderOpen, Trash2, Loader2 } from 'lucide-react';
+import TeamSheetBuilder from '@/components/team-sheet/TeamSheetBuilder';
+import { db, type SavedTeamSheet } from '@/lib/db/matchday-db';
 
 // GAA match durations by grade (minutes per half) — UR-042
 const GRADE_DURATIONS: Record<string, number> = {
-  senior: 35,        // Senior inter-county: 70 min total (35+35)
-  intermediate: 30,  // Adult standard: 60 min total (30+30)
-  junior: 25,        // Junior: 50 min total (25+25)
-  under21: 30,       // Under-21: 60 min total
-  minor: 25,         // Minor: 50 min total
+  senior: 35,
+  intermediate: 30,
+  junior: 25,
+  under21: 30,
+  minor: 25,
 };
 
 // Common GAA competitions — UR-085
@@ -30,28 +33,102 @@ export default function NewMatchPage() {
   const router = useRouter();
   const createMatch = useMatchStore((s) => s.createMatch);
   const accessibilityMode = useSettingsStore((s) => s.accessibilityMode);
-  
+
   const rainMode = accessibilityMode === 'rain-mode';
 
   const [sport, setSport] = useState<'gaelic-football' | 'hurling'>('gaelic-football');
   const [grade, setGrade] = useState<string>('senior');
-  const [homeTeam, setHomeTeam] = useState('');
-  const [awayTeam, setAwayTeam] = useState('');
+  const [homeTeamName, setHomeTeamName] = useState('');
+  const [awayTeamName, setAwayTeamName] = useState('');
   const [venue, setVenue] = useState('');
   const [referee, setReferee] = useState('');
   const [competition, setCompetition] = useState('');
+  
+  // Team sheet state
+  const [homePlayers, setHomePlayers] = useState<Player[]>([]);
+  const [awayPlayers, setAwayPlayers] = useState<Player[]>([]);
+  const [showHomeSheet, setShowHomeSheet] = useState(false);
+  const [showAwaySheet, setShowAwaySheet] = useState(false);
+
+  // Load past team sheets state
+  const [pastTeamSheets, setPastTeamSheets] = useState<SavedTeamSheet[]>([]);
+  const [loadingTeamSheets, setLoadingTeamSheets] = useState(true);
+  const [showLoadSheet, setShowLoadSheet] = useState(false);
+
+  // Load past team sheets on mount
+  useEffect(() => {
+    async function loadTeamSheets() {
+      try {
+        const sheets = await db.teamsheets.toArray();
+        setPastTeamSheets(sheets);
+      } catch (error) {
+        console.error('Failed to load team sheets:', error);
+      } finally {
+        setLoadingTeamSheets(false);
+      }
+    }
+    loadTeamSheets();
+  }, []);
+
+  const handleLoadSheet = async (sheet: SavedTeamSheet, targetSide: 'home' | 'away') => {
+    const players: Player[] = sheet.players.map(p => ({
+      id: p.id,
+      playerId: p.playerId,
+      name: p.name,
+      number: p.number,
+      position: p.position,
+      isStarter: p.isStarter,
+      goals: 0,
+      points: 0,
+      yellowCards: 0,
+      blackCards: 0,
+      redCards: 0,
+      isSubstituted: false,
+    }));
+
+    if (targetSide === 'home') {
+      setHomePlayers(players);
+      setHomeTeamName(sheet.name);
+    } else {
+      setAwayPlayers(players);
+      setAwayTeamName(sheet.name);
+    }
+    setShowLoadSheet(false);
+  };
+
+  const handleDeleteSheet = async (sheetId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await db.teamsheets.delete(sheetId);
+    setPastTeamSheets(prev => prev.filter(s => s.id !== sheetId));
+  };
 
   const handleCreate = () => {
-    if (!homeTeam || !awayTeam) return;
+    if (!homeTeamName || !awayTeamName) return;
 
-    // Initialize match state (UR-001: create in <60s)
-    createMatch(
-      { name: homeTeam, shortCode: homeTeam.substring(0, 3).toUpperCase(), goals: 0, points: 0 },
-      { name: awayTeam, shortCode: awayTeam.substring(0, 3).toUpperCase(), goals: 0, points: 0 },
-      sport
-    );
+    // Validate team sheets have at least 15 players each
+    if (homePlayers.length < 15 || awayPlayers.length < 15) {
+      alert('Please add at least 15 players to each team sheet before creating the match.');
+      return;
+    }
 
-    // Update venue and referee if provided
+    const homeTeam: Team = {
+      name: homeTeamName,
+      shortCode: homeTeamName.substring(0, 3).toUpperCase(),
+      goals: 0,
+      points: 0,
+      players: homePlayers,
+    };
+
+    const awayTeam: Team = {
+      name: awayTeamName,
+      shortCode: awayTeamName.substring(0, 3).toUpperCase(),
+      goals: 0,
+      points: 0,
+      players: awayPlayers,
+    };
+
+    createMatch(homeTeam, awayTeam, sport);
+
     if (venue || referee) {
       const { match } = useMatchStore.getState();
       if (match) {
@@ -61,135 +138,289 @@ export default function NewMatchPage() {
       }
     }
 
-    // Start the match and navigate to live screen
     const { startMatch } = useMatchStore.getState();
     startMatch();
-
-    // Navigate to live match screen
     router.push('/matches/active');
   };
 
+  const canCreateMatch = homeTeamName && awayTeamName && homePlayers.length >= 15 && awayPlayers.length >= 15;
+
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6">
+    <div className="mx-auto max-w-2xl px-4 py-8">
       {/* Back Button */}
-      <Link href="/" className="mb-4 inline-block text-sm text-gaa-green hover:underline">
-        ← Back to Home
+      <Link href="/" className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-gaa-green hover:underline">
+        <ArrowLeft className="w-4 h-4" />
+        Back to Home
       </Link>
 
-      <h1 className={`${rainMode ? 'text-rain-lg' : 'text-2xl'} font-black text-gaa-green mb-6`}>
-        New Match
-      </h1>
+      {/* Page Header */}
+      <div className="mb-8">
+        <h1 className={`font-bold tracking-tight ${rainMode ? 'text-rain-lg' : 'text-3xl'} text-gaa-green`}>
+          New Match
+        </h1>
+        <p className={`mt-1 ${rainMode ? 'text-rain-sm' : 'text-sm'} text-gray-500`}>
+          Set up a match in under 60 seconds
+        </p>
+      </div>
 
-      {/* Sport Selection (UR-031) */}
-      <div className="mb-4">
-        <label className={`block mb-1 font-semibold ${rainMode ? 'text-rain-md' : ''}`}>Sport</label>
-        <div className="flex gap-2">
+      {/* Sport Selection */}
+      <div className="mb-6">
+        <label className={`block mb-2 text-sm font-semibold ${rainMode ? 'text-rain-md' : ''}`}>Sport</label>
+        <div className="flex gap-3">
           {(['gaelic-football', 'hurling'] as const).map((s) => (
             <button
               key={s}
               onClick={() => setSport(s)}
-              className={`flex-1 rounded-lg border p-4 text-center capitalize transition ${
-                sport === s ? 'border-gaa-green bg-green-50 font-bold' : ''
+              className={`flex-1 rounded-xl border p-4 text-center transition ${
+                sport === s
+                  ? 'border-gaa-green bg-gaa-green-muted font-semibold'
+                  : 'border-gray-200 hover:border-gray-300'
               }`}
             >
-              {s === 'gaelic-football' ? '⚽ Football' : '🏑 Hurling'}
+              <Trophy className={`w-6 h-6 mx-auto mb-1 ${
+                sport === s ? 'text-gaa-green' : 'text-gray-400'
+              }`} />
+              <span className={`capitalize text-sm ${rainMode ? 'text-rain-sm' : ''}`}>
+                {s === 'gaelic-football' ? 'Football' : 'Hurling'}
+              </span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Grade Selection (UR-031, UR-042) */}
-      <div className="mb-4">
-        <label className={`block mb-1 font-semibold ${rainMode ? 'text-rain-md' : ''}`}>Grade</label>
-        <select
-          value={grade}
-          onChange={(e) => setGrade(e.target.value)}
-          className={`w-full rounded-lg border p-3 ${rainMode ? 'min-h-[60px] text-xl' : ''}`}
+      {/* Match Details Card */}
+      <div className="card-elevated p-5 mb-6">
+        <h2 className={`text-sm font-semibold mb-4 ${rainMode ? 'text-rain-md' : ''}`}>Match Details</h2>
+        
+        <div className="space-y-4">
+          {/* Grade */}
+          <div>
+            <label className={`block mb-1.5 text-xs font-medium text-gray-600 ${rainMode ? 'text-rain-sm' : ''}`}>Grade</label>
+            <select
+              value={grade}
+              onChange={(e) => setGrade(e.target.value)}
+              className={`input-field ${rainMode ? 'min-h-[60px] text-xl' : ''}`}
+            >
+              {Object.keys(GRADE_DURATIONS).map((g) => (
+                <option key={g} value={g}>
+                  {g.charAt(0).toUpperCase() + g.slice(1)} ({GRADE_DURATIONS[g]} min/half)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Competition */}
+          <div>
+            <label className={`block mb-1.5 text-xs font-medium text-gray-600 ${rainMode ? 'text-rain-sm' : ''}`}>Competition</label>
+            <select
+              value={competition}
+              onChange={(e) => setCompetition(e.target.value)}
+              className={`input-field ${rainMode ? 'min-h-[60px] text-xl' : ''}`}
+            >
+              {COMPETITIONS.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Venue */}
+          <div className="relative">
+            <label className={`block mb-1.5 text-xs font-medium text-gray-600 ${rainMode ? 'text-rain-sm' : ''}`}>Venue</label>
+            <MapPin className="absolute left-3 top-[2.4rem] w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={venue}
+              onChange={(e) => setVenue(e.target.value)}
+              placeholder="e.g. Croke Park, Páirc Tailteann..."
+              className={`input-field pl-9 ${rainMode ? 'min-h-[60px] text-xl' : ''}`}
+            />
+          </div>
+
+          {/* Referee */}
+          <div className="relative">
+            <label className={`block mb-1.5 text-xs font-medium text-gray-600 ${rainMode ? 'text-rain-sm' : ''}`}>Referee</label>
+            <User className="absolute left-3 top-[2.4rem] w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={referee}
+              onChange={(e) => setReferee(e.target.value)}
+              placeholder="Enter referee name..."
+              className={`input-field pl-9 ${rainMode ? 'min-h-[60px] text-xl' : ''}`}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Teams Card */}
+      <div className="card-elevated p-5 mb-4">
+        <h2 className={`text-sm font-semibold mb-4 ${rainMode ? 'text-rain-md' : ''}`}>Teams</h2>
+        
+        <div className="space-y-4">
+          {/* Home Team */}
+          <div className="relative">
+            <label className={`block mb-1.5 text-xs font-medium text-gray-600 ${rainMode ? 'text-rain-sm' : ''}`}>Home Team</label>
+            <Shield className="absolute left-3 top-[2.4rem] w-4 h-4 text-blue-500" />
+            <input
+              type="text"
+              value={homeTeamName}
+              onChange={(e) => setHomeTeamName(e.target.value)}
+              placeholder="Enter team name..."
+              className={`input-field pl-9 ${rainMode ? 'min-h-[60px] text-xl' : ''}`}
+            />
+          </div>
+
+          {/* Away Team */}
+          <div className="relative">
+            <label className={`block mb-1.5 text-xs font-medium text-gray-600 ${rainMode ? 'text-rain-sm' : ''}`}>Away Team</label>
+            <Shield className="absolute left-3 top-[2.4rem] w-4 h-4 text-red-500" />
+            <input
+              type="text"
+              value={awayTeamName}
+              onChange={(e) => setAwayTeamName(e.target.value)}
+              placeholder="Enter team name..."
+              className={`input-field pl-9 ${rainMode ? 'min-h-[60px] text-xl' : ''}`}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Load Past Team Sheet Section */}
+      <div className="mb-6">
+        <button
+          onClick={() => setShowLoadSheet(!showLoadSheet)}
+          className={`w-full flex items-center justify-between p-4 rounded-xl border transition-colors ${
+            showLoadSheet ? 'border-green-300 bg-green-50' : 'border-gray-200 hover:border-gray-300'
+          }`}
         >
-          {Object.keys(GRADE_DURATIONS).map((g) => (
-            <option key={g} value={g}>
-              {g.charAt(0).toUpperCase() + g.slice(1)} ({GRADE_DURATIONS[g]} min/half)
-            </option>
-          ))}
-        </select>
+          <div className="flex items-center gap-3">
+            <FolderOpen className="w-5 h-5 text-green-600" />
+            <div className="text-left">
+              <h3 className={`font-semibold ${rainMode ? 'text-rain-md' : ''}`}>
+                Load Past Team Sheet
+              </h3>
+              <p className={`text-xs text-gray-500`}>
+                {loadingTeamSheets ? 'Loading...' : `${pastTeamSheets.length} saved sheets`}
+              </p>
+            </div>
+          </div>
+        </button>
+
+        {showLoadSheet && (
+          <div className="mt-3 space-y-2">
+            {loadingTeamSheets ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+              </div>
+            ) : pastTeamSheets.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-4">No saved team sheets yet</p>
+            ) : (
+              pastTeamSheets.map((sheet) => (
+                <div
+                  key={sheet.id}
+                  onClick={() => handleLoadSheet(sheet, homePlayers.length === 0 ? 'home' : 'away')}
+                  className="flex items-center justify-between p-3 rounded-lg border bg-white hover:bg-gray-50 cursor-pointer transition-colors"
+                >
+                  <div>
+                    <p className="font-medium text-sm">{sheet.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {sheet.players.length} players • {new Date(sheet.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <button
+                    onClick={(e) => handleDeleteSheet(sheet.id, e)}
+                    className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Competition Selection (UR-085) */}
-      <div className="mb-4">
-        <label className={`block mb-1 font-semibold ${rainMode ? 'text-rain-md' : ''}`}>Competition</label>
-        <select
-          value={competition}
-          onChange={(e) => setCompetition(e.target.value)}
-          className={`w-full rounded-lg border p-3 ${rainMode ? 'min-h-[60px] text-xl' : ''}`}
+      {/* Team Sheets Section */}
+      <div className="mb-6">
+        <button
+          onClick={() => setShowHomeSheet(!showHomeSheet)}
+          className={`w-full flex items-center justify-between p-4 rounded-xl border transition-colors ${
+            showHomeSheet ? 'border-blue-300 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+          }`}
         >
-          {COMPETITIONS.map((c) => (
-            <option key={c.value} value={c.value}>{c.label}</option>
-          ))}
-        </select>
+          <div className="flex items-center gap-3">
+            <Shield className="w-5 h-5 text-blue-500" />
+            <div className="text-left">
+              <h3 className={`font-semibold ${rainMode ? 'text-rain-md' : ''}`}>
+                {homeTeamName || 'Home Team'} Sheet
+              </h3>
+              <p className={`text-xs text-gray-500`}>
+                {homePlayers.length}/15 players • {homePlayers.filter(p => p.isStarter).length} starters
+              </p>
+            </div>
+          </div>
+          <Users className="w-5 h-5 text-gray-400" />
+        </button>
+
+        {showHomeSheet && (
+          <TeamSheetBuilder 
+            teamName={homeTeamName || 'Home Team'} 
+            teamSide="home"
+            initialPlayers={homePlayers.length > 0 ? homePlayers : undefined}
+            onPlayersChange={(players) => setHomePlayers(players)}
+          />
+        )}
       </div>
 
-      {/* Venue (UR-002) */}
-      <div className="mb-4">
-        <label className={`block mb-1 font-semibold ${rainMode ? 'text-rain-md' : ''}`}>Venue</label>
-        <input
-          type="text"
-          value={venue}
-          onChange={(e) => setVenue(e.target.value)}
-          placeholder="e.g. Croke Park, Páirc Tailteann..."
-          className={`w-full rounded-lg border p-3 ${rainMode ? 'min-h-[60px] text-xl' : ''}`}
-        />
-      </div>
+      <div className="mb-6">
+        <button
+          onClick={() => setShowAwaySheet(!showAwaySheet)}
+          className={`w-full flex items-center justify-between p-4 rounded-xl border transition-colors ${
+            showAwaySheet ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:border-gray-300'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <Shield className="w-5 h-5 text-red-500" />
+            <div className="text-left">
+              <h3 className={`font-semibold ${rainMode ? 'text-rain-md' : ''}`}>
+                {awayTeamName || 'Away Team'} Sheet
+              </h3>
+              <p className={`text-xs text-gray-500`}>
+                {awayPlayers.length}/15 players • {awayPlayers.filter(p => p.isStarter).length} starters
+              </p>
+            </div>
+          </div>
+          <Users className="w-5 h-5 text-gray-400" />
+        </button>
 
-      {/* Referee (UR-002) */}
-      <div className="mb-4">
-        <label className={`block mb-1 font-semibold ${rainMode ? 'text-rain-md' : ''}`}>Referee</label>
-        <input
-          type="text"
-          value={referee}
-          onChange={(e) => setReferee(e.target.value)}
-          placeholder="Enter referee name..."
-          className={`w-full rounded-lg border p-3 ${rainMode ? 'min-h-[60px] text-xl' : ''}`}
-        />
-      </div>
-
-      {/* Team Selection */}
-      <div className="mb-4">
-        <label className={`block mb-1 font-semibold ${rainMode ? 'text-rain-md' : ''}`}>Home Team</label>
-        <input
-          type="text"
-          value={homeTeam}
-          onChange={(e) => setHomeTeam(e.target.value)}
-          placeholder="Enter team name..."
-          className={`w-full rounded-lg border p-3 ${rainMode ? 'min-h-[60px] text-xl' : ''}`}
-        />
-      </div>
-
-      <div className="mb-4">
-        <label className={`block mb-1 font-semibold ${rainMode ? 'text-rain-md' : ''}`}>Away Team</label>
-        <input
-          type="text"
-          value={awayTeam}
-          onChange={(e) => setAwayTeam(e.target.value)}
-          placeholder="Enter team name..."
-          className={`w-full rounded-lg border p-3 ${rainMode ? 'min-h-[60px] text-xl' : ''}`}
-        />
+        {showAwaySheet && (
+          <TeamSheetBuilder 
+            teamName={awayTeamName || 'Away Team'} 
+            teamSide="away"
+            initialPlayers={awayPlayers.length > 0 ? awayPlayers : undefined}
+            onPlayersChange={(players) => setAwayPlayers(players)}
+          />
+        )}
       </div>
 
       {/* Create Button */}
       <button
         onClick={handleCreate}
-        disabled={!homeTeam || !awayTeam}
-        className={`w-full rounded-xl bg-gaa-green py-4 font-bold text-white shadow-lg transition ${
-          homeTeam && awayTeam ? 'hover:bg-gaa-green-light active:scale-[0.98]' : 'bg-gray-300 cursor-not-allowed'
+        disabled={!canCreateMatch}
+        className={`btn-primary w-full py-3.5 text-center ${
+          canCreateMatch ? '' : 'bg-gray-300 cursor-not-allowed'
         } ${rainMode ? 'text-rain-md min-h-[60px]' : ''}`}
       >
-        Create Match
+        Create Match {canCreateMatch && `(${homePlayers.length + awayPlayers.length} players)`}
       </button>
 
-      {/* Hint */}
-      <p className="mt-3 text-center text-xs text-gray-500">
-        Tip: Team names are auto-filled from your last 5 matches
-      </p>
+      {!canCreateMatch && (
+        <p className="mt-2 text-center text-xs text-gray-500">
+          {!homeTeamName && '• Enter home team name'}
+          {homeTeamName && !awayTeamName && ' • Enter away team name'}
+          {homeTeamName && awayTeamName && homePlayers.length < 15 && ` • Add ${15 - homePlayers.length} more players to ${homeTeamName}`}
+          {homeTeamName && awayTeamName && homePlayers.length >= 15 && awayPlayers.length < 15 && ` • Add ${15 - awayPlayers.length} more players to ${awayTeamName}`}
+        </p>
+      )}
     </div>
   );
 }

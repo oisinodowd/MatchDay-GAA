@@ -33,7 +33,6 @@ export default function TimelinePage() {
   const accessibilityMode = useSettingsStore((s) => s.accessibilityMode);
 
   const rainMode = accessibilityMode === 'rain-mode';
-  const highContrast = accessibilityMode === 'high-contrast';
 
   const [editingEvent, setEditingEvent] = useState<number | null>(null);
   const [editMinute, setEditMinute] = useState(0);
@@ -114,7 +113,7 @@ export default function TimelinePage() {
       </h1>
 
       {events.length === 0 ? (
-        <div className={`rounded-xl border-2 border-dashed p-8 text-center ${highContrast ? 'border-black' : 'border-gray-300'}`}>
+        <div className="rounded-xl border-2 border-dashed p-8 text-center border-gray-300">
           <p className="text-gray-500">No events recorded yet.</p>
           <p className="text-sm text-gray-400 mt-1">Go back to the scoring panel to start recording.</p>
         </div>
@@ -131,7 +130,7 @@ export default function TimelinePage() {
                 onDrop={() => handleDrop(index)}
                 className={`flex items-center gap-3 rounded-lg border p-3 transition ${
                   draggedIndex === index ? 'opacity-50' : ''
-                } ${editingEvent === index ? 'border-gaa-green bg-green-50' : ''} ${highContrast ? 'border-2 border-black' : ''}`}
+                } ${editingEvent === index ? 'border-gaa-green bg-green-50' : ''}`}
               >
                 {/* Drag Handle */}
                 <GripVertical className="w-5 h-5 text-gray-400 flex-shrink-0" />
