@@ -86,7 +86,7 @@ function PlayerRow({ player, index, onUpdate, onRemove, onMoveUp, onMoveDown, ca
         value={player.name}
         onChange={(e) => onUpdate({ name: e.target.value })}
         placeholder="Player name"
-        className="flex-1 px-3 py-2 border rounded-lg text-sm min-w-0"
+        className="flex-1 px-3 py-2 border rounded-lg text-sm min-w-0 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
       />
 
       {/* Position */}
