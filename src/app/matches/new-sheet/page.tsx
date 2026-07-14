@@ -26,17 +26,29 @@ interface PlayerRowProps {
 
 function PlayerRow({ player, index, onUpdate, onRemove, onMoveUp, onMoveDown, canMoveUp, canMoveDown, dragIndex, setDragIndex, onReorder }: PlayerRowProps) {
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+    // Prevent drag when interacting with form elements
+    if ((e.target as HTMLElement).closest('input, button, select, textarea')) {
+      e.preventDefault();
+      return;
+    }
     e.dataTransfer.setData('text/plain', String(index));
     e.dataTransfer.effectAllowed = 'move';
     setDragIndex(index);
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
+    // Prevent default only when not over form elements
+    if (!(e.target as HTMLElement).closest('input, button, select, textarea')) {
+      e.preventDefault();
+    }
     e.dataTransfer.dropEffect = 'move';
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    // Prevent drop when over form elements
+    if ((e.target as HTMLElement).closest('input, button, select, textarea')) {
+      return;
+    }
     e.preventDefault();
     const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
     if (!isNaN(fromIndex) && fromIndex !== index && onReorder) {
