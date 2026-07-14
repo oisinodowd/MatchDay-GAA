@@ -87,7 +87,7 @@ function PlayerRow({ player, index, onUpdate, onRemove, onMoveUp, onMoveDown, ca
 
       {/* Position */}
       <PositionSelector
-        position={player.position}
+        value={player.position || 'SUB'}
         onChange={(pos) => onUpdate({ position: pos })}
       />
 
