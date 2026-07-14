@@ -48,6 +48,18 @@ function PlayerRow({ player, index, onUpdate, onRemove, onMoveUp, onMoveDown, ca
     // Prevent drop when over form elements
     if ((e.target as HTMLElement).closest('input, button, select, textarea')) {
       return;
+    }=> {
+    // Prevent default only when not over form elements
+    if (!(e.target as HTMLElement).closest('input, button, select, textarea')) {
+      e.preventDefault();
+    }
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    // Prevent drop when over form elements
+    if ((e.target as HTMLElement).closest('input, button, select, textarea')) {
+      return;
     }
     e.preventDefault();
     const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
