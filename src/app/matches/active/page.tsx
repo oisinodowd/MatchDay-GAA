@@ -5,7 +5,10 @@ import Link from 'next/link';
 import { useMatchStore } from '@/stores/match-store';
 import ScoringPanel from '@/components/scoring-panel/ScoringPanel';
 import AccessibilityToggle from '@/components/accessibility/AccessibilityToggle';
-import { ArrowLeft, Play, SkipForward, RotateCcw, BarChart3, Users, FileText } from 'lucide-react';
+import TeamSheetView from '@/components/team-sheet/TeamSheetView';
+import { ArrowLeft, Play, SkipForward, RotateCcw, BarChart3, Users, FileText, Sheet } from 'lucide-react';
+
+type TabType = 'scoring' | 'teamsheets';
 
 export default function ActiveMatchPage() {
   const match = useMatchStore((s) => s.match);
@@ -15,6 +18,7 @@ export default function ActiveMatchPage() {
   const resetMatch = useMatchStore((s) => s.resetMatch);
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>('scoring');
 
   // Guard: redirect to home if no match exists
   if (!match) {
@@ -88,18 +92,40 @@ export default function ActiveMatchPage() {
       <div className="flex gap-2 mb-4">
         <button
           onClick={() => setActiveTab('scoring')}
-          className={`flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors bg-gaa-green text-white`}
+          className={`flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors ${
+            activeTab === 'scoring' 
+              ? 'bg-gaa-green text-white' 
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
         >
           Scoring
+        </button>
+        <button
+          onClick={() => setActiveTab('teamsheets')}
+          className={`flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors ${
+            activeTab === 'teamsheets' 
+              ? 'bg-gaa-green text-white' 
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          Team Sheets
         </button>
       </div>
 
       {/* Tab Content */}
-      <div className="space-y-4">
-        {/* Scoring Panels — one per team (UR-004–7, UR-076–8) */}
-        <ScoringPanel teamSide="home" teamName={homeTeam.name} />
-        <ScoringPanel teamSide="away" teamName={awayTeam.name} />
-      </div>
+      {activeTab === 'scoring' ? (
+        <div className="space-y-4">
+          {/* Scoring Panels — one per team (UR-004–7, UR-076–8) */}
+          <ScoringPanel teamSide="home" teamName={homeTeam.name} />
+          <ScoringPanel teamSide="away" teamName={awayTeam.name} />
+        </div>
+      ) : (
+        /* Team Sheets Tab */
+        <div className="space-y-4">
+          <TeamSheetView teamSide="home" />
+          <TeamSheetView teamSide="away" />
+        </div>
+      )}
 
       {/* Accessibility Settings Panel (UR-079–80) */}
       <div className="mt-6">
