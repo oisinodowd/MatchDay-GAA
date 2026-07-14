@@ -26,35 +26,24 @@ interface PlayerRowProps {
 
 function PlayerRow({ player, index, onUpdate, onRemove, onMoveUp, onMoveDown, canMoveUp, canMoveDown, dragIndex, setDragIndex, onReorder }: PlayerRowProps) {
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
-    // Prevent drag when interacting with form elements
-    if ((e.target as HTMLElement).closest('input, button, select, textarea')) {
-      e.preventDefault();
-      return;
-    }
     e.dataTransfer.setData('text/plain', String(index));
     e.dataTransfer.effectAllowed = 'move';
     setDragIndex(index);
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    // Prevent default only when not over form elements
-    if (!(e.target as HTMLElement).closest('input, button, select, textarea')) {
-      e.preventDefault();
-    }
+    e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    // Prevent drop when over form elements
-    if ((e.target as HTMLElement).closest('input, button, select, textarea')) {
-      return;
-    }
     e.preventDefault();
-    const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
-    if (!isNaN(fromIndex) && fromIndex !== index && onReorder) {
-      onReorder(fromIndex, index);
+    if (onReorder) {
+      const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+      if (!isNaN(fromIndex) && fromIndex !== index) {
+        onReorder(fromIndex, index);
+      }
     }
-    setDragIndex(null);
   };
 
   const handleDragEnd = () => {
@@ -63,17 +52,20 @@ function PlayerRow({ player, index, onUpdate, onRemove, onMoveUp, onMoveDown, ca
 
   return (
     <div
-      draggable
-      onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
-      onDragEnd={handleDragEnd}
       className={`flex items-center gap-3 p-3 rounded-lg border bg-white transition-opacity ${
         dragIndex === index ? 'opacity-50' : 'opacity-100'
       } ${dragIndex !== null && dragIndex !== index ? 'hover:border-green-400 hover:bg-green-50/30' : ''}`}
     >
-      {/* Drag Handle */}
-      <div className="text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0">
+      {/* Drag Handle - only this is draggable */}
+      <div
+        draggable
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        className="text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0"
+        title="Drag to reorder"
+      >
         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 16 16">
           <path d="M7 2a1 1 0 1 1 2 0 1 1 0 0 1-2 0zm0 2a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM8 6a1 1 0 1 1 2 0 1 1 0 0 1-2 0zm0 2a1 1 0 1 1 2 0 1 1 0 0 1-2 0zm0 4a1 1 0 1 1 2 0 1 1 0 0 1-2 0z" />
         </svg>
