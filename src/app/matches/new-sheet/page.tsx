@@ -21,9 +21,10 @@ interface PlayerRowProps {
   canMoveDown: boolean;
   dragIndex: number | null;
   setDragIndex: (index: number | null) => void;
+  onReorder?: (fromIndex: number, toIndex: number) => void;
 }
 
-function PlayerRow({ player, index, onUpdate, onRemove, onMoveUp, onMoveDown, canMoveUp, canMoveDown, dragIndex, setDragIndex }: PlayerRowProps) {
+function PlayerRow({ player, index, onUpdate, onRemove, onMoveUp, onMoveDown, canMoveUp, canMoveDown, dragIndex, setDragIndex, onReorder }: PlayerRowProps) {
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
     e.dataTransfer.setData('text/plain', String(index));
     e.dataTransfer.effectAllowed = 'move';
@@ -38,8 +39,8 @@ function PlayerRow({ player, index, onUpdate, onRemove, onMoveUp, onMoveDown, ca
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
-    if (!isNaN(fromIndex) && fromIndex !== index) {
-      onUpdate({ _reorderFrom: fromIndex });
+    if (!isNaN(fromIndex) && fromIndex !== index && onReorder) {
+      onReorder(fromIndex, index);
     }
     setDragIndex(null);
   };
@@ -227,20 +228,13 @@ export default function NewTeamsheetPage() {
   }, []);
 
   const updatePlayer = useCallback((index: number, updates: Partial<Player>) => {
-    // Handle drag reorder special case
-    if ('_reorderFrom' in updates) {
-      const fromIndex = (updates as any)._reorderFrom;
-      handleDropReorder(fromIndex, index);
-      return;
-    }
-    
     setPlayers(prev => {
       const updated = [...prev];
       // Only update the specific fields passed in, preserving isStarter unless explicitly changed
       updated[index] = { ...updated[index], ...updates };
       return updated;
     });
-  }, [handleDropReorder]);
+  }, []);
 
   const handleQuickAdd = useCallback(() => {
     const defaultPlayers: Player[] = [];
@@ -469,6 +463,7 @@ export default function NewTeamsheetPage() {
                   canMoveDown={index < 14}
                   dragIndex={dragIndex}
                   setDragIndex={setDragIndex}
+                  onReorder={(fromIdx, toIdx) => handleDropReorder(fromIdx, toIdx)}
                 />
               ))}
             </div>
@@ -497,6 +492,7 @@ export default function NewTeamsheetPage() {
                     canMoveDown={subIndex < substitutes.length - 1}
                     dragIndex={dragIndex}
                     setDragIndex={setDragIndex}
+                    onReorder={(fromIdx, toIdx) => handleDropReorder(fromIdx, toIdx)}
                   />
                 );
               })}
