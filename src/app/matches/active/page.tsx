@@ -4,11 +4,13 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useMatchStore } from '@/stores/match-store';
 import ScoringPanel from '@/components/scoring-panel/ScoringPanel';
+import CardPanel from '@/components/card-panel/CardPanel';
 import AccessibilityToggle from '@/components/accessibility/AccessibilityToggle';
 import TeamSheetView from '@/components/team-sheet/TeamSheetView';
-import { ArrowLeft, Play, SkipForward, RotateCcw, BarChart3, Users, FileText, Sheet } from 'lucide-react';
+import { ArrowLeft, Play, SkipForward, RotateCcw, BarChart3, Users, FileText, Clock } from 'lucide-react';
+import { useEffect } from 'react';
 
-type TabType = 'scoring' | 'teamsheets';
+type TabType = 'scoring' | 'teamsheets' | 'cards';
 
 export default function ActiveMatchPage() {
   const match = useMatchStore((s) => s.match);
@@ -19,6 +21,36 @@ export default function ActiveMatchPage() {
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('scoring');
+  
+  // Live timer state (seconds elapsed)
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  
+  // Run a live timer when match is active
+  useEffect(() => {
+    if (!match || match.status === 'draft' || match.status === 'completed' || match.status === 'postponed' || match.status === 'cancelled') {
+      setElapsedSeconds(0);
+      return;
+    }
+    
+    const interval = setInterval(() => {
+      setElapsedSeconds(prev => prev + 1);
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [match?.status]);
+  
+  // Sync elapsed seconds when advancing minute or changing half
+  useEffect(() => {
+    if (match && match.status !== 'draft') {
+      setElapsedSeconds(match.currentMinute * 60);
+    }
+  }, [match?.currentMinute, match?.currentHalf]);
+  
+  const formatTimer = (totalSeconds: number): string => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // Guard: redirect to home if no match exists
   if (!match) {
@@ -41,6 +73,8 @@ export default function ActiveMatchPage() {
   // Calculate total points for display
   const homeTotal = homeTeam.goals * 3 + homeTeam.points;
   const awayTotal = awayTeam.goals * 3 + awayTeam.points;
+  const homeLead = homeTotal - awayTotal;
+  const awayLead = awayTotal - homeTotal;
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
@@ -60,13 +94,16 @@ export default function ActiveMatchPage() {
         </p>
         
         {/* Score Display */}
-        <div className="mt-6 flex items-center justify-center gap-12">
+        <div className="mt-6 flex items-center justify-center gap-8">
           <div className="text-center">
             <p className={`font-semibold ${'text-base'} text-gray-700`}>{homeTeam.name}</p>
-            <p className={`score-display font-black ${'text-4xl'} tabular-nums text-gaa-green`}>
-              {homeTotal}
+            <p className={`score-display font-black ${'text-5xl'} tabular-nums text-gaa-green leading-tight`}>
+              {homeTeam.goals}-{homeTeam.points}
             </p>
-            <p className={`mt-0.5 ${'text-xs'} text-gray-500`}>{homeTeam.goals}-{homeTeam.points}</p>
+            <p className={`mt-0.5 ${'text-xs'} text-gray-400`}>({homeTotal} pts)</p>
+            {homeLead > 0 && (
+              <p className="text-xs font-semibold text-green-600 mt-0.5">+{homeLead} ahead</p>
+            )}
           </div>
           
           <div className="flex flex-col items-center">
@@ -80,11 +117,36 @@ export default function ActiveMatchPage() {
           
           <div className="text-center">
             <p className={`font-semibold ${'text-base'} text-gray-700`}>{awayTeam.name}</p>
-            <p className={`score-display font-black ${'text-4xl'} tabular-nums text-gaa-green`}>
-              {awayTotal}
+            <p className={`score-display font-black ${'text-5xl'} tabular-nums text-gaa-green leading-tight`}>
+              {awayTeam.goals}-{awayTeam.points}
             </p>
-            <p className={`mt-0.5 ${'text-xs'} text-gray-500`}>{awayTeam.goals}-{awayTeam.points}</p>
+            <p className={`mt-0.5 ${'text-xs'} text-gray-400`}>({awayTotal} pts)</p>
+            {awayLead > 0 && (
+              <p className="text-xs font-semibold text-red-600 mt-0.5">+{awayLead} ahead</p>
+            )}
           </div>
+        </div>
+      </div>
+
+      {/* Match Timer Display */}
+      <div className="mb-4 card-elevated p-3 text-center">
+        <div className="flex items-center justify-center gap-2">
+          <Clock className="w-5 h-5 text-gaa-green" />
+          <span className="text-3xl font-black tabular-nums text-gaa-green tracking-tight">
+            {formatTimer(elapsedSeconds)}
+          </span>
+        </div>
+        <div className="flex items-center justify-center gap-2 mt-1">
+          <span className="text-xs text-gray-500 font-medium">
+            {match.currentHalf === 'first-half' ? '1st Half' : '2nd Half'}
+          </span>
+          <span className="text-xs text-gray-400">·</span>
+          <span className="text-xs text-gray-500">
+            {match.halfDuration} min half
+          </span>
+          {match.status === 'halftime' && (
+            <span className="text-xs font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded">HT</span>
+          )}
         </div>
       </div>
 
@@ -101,6 +163,16 @@ export default function ActiveMatchPage() {
           Scoring
         </button>
         <button
+          onClick={() => setActiveTab('cards')}
+          className={`flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors ${
+            activeTab === 'cards' 
+              ? 'bg-gaa-green text-white' 
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          Cards
+        </button>
+        <button
           onClick={() => setActiveTab('teamsheets')}
           className={`flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors ${
             activeTab === 'teamsheets' 
@@ -108,19 +180,24 @@ export default function ActiveMatchPage() {
               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
           }`}
         >
-          Team Sheets
+          Sheets
         </button>
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'scoring' ? (
+      {activeTab === 'scoring' && (
         <div className="space-y-4">
-          {/* Scoring Panels — one per team (UR-004–7, UR-076–8) */}
+          {/* Scoring Panels — one per team */}
           <ScoringPanel teamSide="home" teamName={homeTeam.name} />
           <ScoringPanel teamSide="away" teamName={awayTeam.name} />
         </div>
-      ) : (
-        /* Team Sheets Tab */
+      )}
+      
+      {activeTab === 'cards' && (
+        <CardPanel />
+      )}
+      
+      {activeTab === 'teamsheets' && (
         <div className="space-y-4">
           <TeamSheetView teamSide="home" />
           <TeamSheetView teamSide="away" />

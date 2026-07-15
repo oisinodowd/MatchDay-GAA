@@ -31,6 +31,8 @@ export default function Scoreboard() {
   // Determine which team is leading for visual emphasis
   const homeLeading = homeTotal > awayTotal;
   const awayLeading = awayTotal > homeTotal;
+  const homeLead = homeTotal - awayTotal;
+  const awayLead = awayTotal - homeTotal;
 
   // Check if rain mode is active
   const rainMode = accessibilityMode === 'rain-mode';
@@ -67,13 +69,17 @@ export default function Scoreboard() {
             <span className={`${rainMode ? 'text-rain-md' : 'text-xs'} font-semibold text-white truncate max-w-[40%]`}>
               {homeTeam.name || 'HOME'}
             </span>
-            <div className="flex items-baseline gap-1">
-              <span className={`${rainMode ? 'text-rain-xl' : 'text-lg'} font-bold text-gaa-gold tabular-nums`}>                {homeNotation}
+            <div className="flex items-baseline gap-1.5">
+              <span className={`${rainMode ? 'text-rain-xl' : 'text-xl'} font-bold text-gaa-gold tabular-nums`}>
+                {homeNotation}
               </span>
               {!rainMode && (
-                <span className="text-[10px] text-green-200">({homeTotal})</span>
+                <span className="text-[10px] text-green-300">({homeTotal})</span>
               )}
             </div>
+            {homeLead > 0 && !rainMode && (
+              <span className="text-[9px] text-gaa-gold font-medium">+{homeLead}</span>
+            )}
           </div>
 
           {/* Match Status / Time */}
@@ -94,14 +100,17 @@ export default function Scoreboard() {
             <span className={`${rainMode ? 'text-rain-md' : 'text-xs'} font-semibold text-white truncate max-w-[40%]`}>
               {awayTeam.name || 'AWAY'}
             </span>
-            <div className="flex items-baseline gap-1">
-              <span className={`${rainMode ? 'text-rain-xl' : 'text-lg'} font-bold text-gaa-gold tabular-nums`}>
+            <div className="flex items-baseline gap-1.5">
+              <span className={`${rainMode ? 'text-rain-xl' : 'text-xl'} font-bold text-gaa-gold tabular-nums`}>
                 {awayNotation}
               </span>
               {!rainMode && (
-                <span className="text-[10px] text-green-200">({awayTotal})</span>
+                <span className="text-[10px] text-green-300">({awayTotal})</span>
               )}
             </div>
+            {awayLead > 0 && !rainMode && (
+              <span className="text-[9px] text-gaa-gold font-medium">+{awayLead}</span>
+            )}
           </div>
         </div>
       </div>

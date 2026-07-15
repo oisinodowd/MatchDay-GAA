@@ -9,14 +9,13 @@ import { ArrowLeft, Trophy, MapPin, User, Shield, Users, FolderOpen, Trash2, Loa
 import TeamSheetBuilder from '@/components/team-sheet/TeamSheetBuilder';
 import { db, type SavedTeamSheet } from '@/lib/db/matchday-db';
 
-// GAA match durations by grade (minutes per half) — UR-042
-const GRADE_DURATIONS: Record<string, number> = {
-  senior: 35,
-  intermediate: 30,
-  junior: 25,
-  under21: 30,
-  minor: 25,
-};
+// GAA match durations — time-based presets (minutes per half)
+const HALF_DURATION_PRESETS = [
+  { value: 35, label: '35 min/half (Senior)' },
+  { value: 30, label: '30 min/half (Intermediate / U21)' },
+  { value: 25, label: '25 min/half (Junior / Minor)' },
+  { value: 12, label: '12 min/quarter (Schools/U12)' },
+];
 
 // Common GAA competitions — UR-085
 const COMPETITIONS = [
@@ -37,7 +36,7 @@ export default function NewMatchPage() {
   const rainMode = accessibilityMode === 'rain-mode';
 
   const [sport, setSport] = useState<'gaelic-football' | 'hurling'>('gaelic-football');
-  const [grade, setGrade] = useState<string>('senior');
+  const [halfDuration, setHalfDuration] = useState<number>(35);
   const [homeTeamName, setHomeTeamName] = useState('');
   const [awayTeamName, setAwayTeamName] = useState('');
   const [venue, setVenue] = useState('');
@@ -127,7 +126,7 @@ export default function NewMatchPage() {
       players: awayPlayers,
     };
 
-    createMatch(homeTeam, awayTeam, sport);
+    createMatch(homeTeam, awayTeam, sport, halfDuration);
 
     if (venue || referee) {
       const { match } = useMatchStore.getState();
@@ -193,17 +192,17 @@ export default function NewMatchPage() {
         <h2 className={`text-sm font-semibold mb-4 ${rainMode ? 'text-rain-md' : ''}`}>Match Details</h2>
         
         <div className="space-y-4">
-          {/* Grade */}
+          {/* Match Duration (Half Length) */}
           <div>
-            <label className={`block mb-1.5 text-xs font-medium text-gray-600 ${rainMode ? 'text-rain-sm' : ''}`}>Grade</label>
+            <label className={`block mb-1.5 text-xs font-medium text-gray-600 ${rainMode ? 'text-rain-sm' : ''}`}>Half Duration</label>
             <select
-              value={grade}
-              onChange={(e) => setGrade(e.target.value)}
+              value={halfDuration}
+              onChange={(e) => { setHalfDuration(Number(e.target.value)); }}
               className={`input-field ${rainMode ? 'min-h-[60px] text-xl' : ''}`}
             >
-              {Object.keys(GRADE_DURATIONS).map((g) => (
-                <option key={g} value={g}>
-                  {g.charAt(0).toUpperCase() + g.slice(1)} ({GRADE_DURATIONS[g]} min/half)
+              {HALF_DURATION_PRESETS.map((preset) => (
+                <option key={preset.value} value={preset.value}>
+                  {preset.label}
                 </option>
               ))}
             </select>

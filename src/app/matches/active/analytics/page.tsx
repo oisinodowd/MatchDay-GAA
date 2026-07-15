@@ -37,6 +37,18 @@ export default function AnalyticsPage() {
 
   // Count two-point shots (outside 40m arc)
   const twoPointShots = scoreEvents.filter(e => e.details?.isTwoPoint).length;
+  
+  // Count wides (if tracked as events)
+  const wideEvents = events.filter(e => e.type === 'point_wide' || e.type === 'goal_wide');
+  const totalWides = wideEvents.length;
+  
+  // Shot efficiency: scores / (scores + wides)
+  const totalShots = scoreEvents.length + totalWides;
+  const shotEfficiency = totalShots > 0 ? Math.round((scoreEvents.length / totalShots) * 100) : 0;
+  
+  // Scoring breakdown by type
+  const goals = scoreEvents.filter(e => e.details?.subtype === 'goal').length;
+  const justPoints = scoreEvents.filter(e => e.details?.subtype === 'point' && !e.details?.isTwoPoint).length;
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
@@ -68,6 +80,22 @@ export default function AnalyticsPage() {
           <div key={label} className={`card-elevated p-4 ${rainMode ? 'p-4' : ''}`}>
             <div className="text-gaa-green mb-2">{icon}</div>
             <div className={`font-bold ${largeText ? 'text-xl' : rainMode ? 'text-rain-md' : 'text-2xl'}`}>{value}</div>
+            <div className={`text-xs font-medium uppercase tracking-wider text-gray-500`}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Second Row of Stats */}
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        {[
+          { icon: <Target className="w-5 h-5" />, label: 'Goals', value: goals, color: 'text-green-600' },
+          { icon: <Target className="w-5 h-5" />, label: 'Points', value: justPoints, color: 'text-blue-600' },
+          { icon: <BarChart3 className="w-5 h-5" />, label: 'Shot Efficiency', value: `${shotEfficiency}%`, color: 'text-purple-600' },
+          { icon: <Target className="w-5 h-5" />, label: 'Wides', value: totalWides, color: 'text-red-600' },
+        ].map(({ icon, label, value, color }) => (
+          <div key={label} className={`card-elevated p-4 ${rainMode ? 'p-4' : ''}`}>
+            <div className={`${color} mb-2`}>{icon}</div>
+            <div className={`font-bold ${largeText ? 'text-xl' : rainMode ? 'text-rain-md' : 'text-2xl'} ${color}`}>{value}</div>
             <div className={`text-xs font-medium uppercase tracking-wider text-gray-500`}>{label}</div>
           </div>
         ))}

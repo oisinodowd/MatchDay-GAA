@@ -445,7 +445,7 @@ function PlayerRow({ player, index, onUpdate, onRemove, onMoveUp, onMoveDown, on
         value={player.name}
         onChange={(e) => onUpdate({ name: e.target.value })}
         placeholder={`Player ${index + 1}`}
-        className="flex-1 text-sm border rounded px-2 py-1 min-w-0"
+        className="flex-1 text-sm border rounded px-2 py-1 min-w-0 text-gray-900 bg-white"
       />
 
       {/* Position Selector */}

@@ -72,9 +72,10 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
       subtype = 'point';
     }
 
-    const playerIndex = selectedPlayer ? parseInt(selectedPlayer.replace('p', '')) - 1 : undefined;
+    const playerIndex = selectedPlayer ? players.findIndex(p => p.id === selectedPlayer) : -1;
+    const validIndex = playerIndex >= 0 ? playerIndex : undefined;
 
-    addScore(teamSide, subtype, playerIndex, isTwoPoint);
+    addScore(teamSide, subtype, validIndex, isTwoPoint);
 
     // Reset selection after scoring (one-tap flow: select player → tap score type)
     setSelectedPlayer('');
@@ -97,10 +98,11 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
       subtype = 'point';
     }
 
-    const playerIndex = selectedPlayer ? parseInt(selectedPlayer.replace('p', '')) - 1 : undefined;
+    const playerIndex = selectedPlayer ? players.findIndex(p => p.id === selectedPlayer) : -1;
+    const validIndex = playerIndex >= 0 ? playerIndex : undefined;
 
     // Store percentage coordinates directly (0-100) for display on pitch image
-    addScore(teamSide, subtype, playerIndex, isTwoPoint, x, y);
+    addScore(teamSide, subtype, validIndex, isTwoPoint, x, y);
 
     // Reset selection after scoring (one-tap flow: select player → tap score type)
     setSelectedPlayer('');
@@ -211,8 +213,8 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
           <button
             onClick={() => {
               if (!selectedPlayer) return;
-              const playerIndex = parseInt(selectedPlayer.replace('p', '')) - 1;
-              addCard(teamSide, 'yellow', playerIndex);
+              const playerIndex = players.findIndex(p => p.id === selectedPlayer);
+              if (playerIndex >= 0) addCard(teamSide, 'yellow', playerIndex);
               setSelectedPlayer('');
             }}
             disabled={!selectedPlayer}
@@ -229,8 +231,8 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
           <button
             onClick={() => {
               if (!selectedPlayer) return;
-              const playerIndex = parseInt(selectedPlayer.replace('p', '')) - 1;
-              addCard(teamSide, 'black', playerIndex);
+              const playerIndex = players.findIndex(p => p.id === selectedPlayer);
+              if (playerIndex >= 0) addCard(teamSide, 'black', playerIndex);
               setSelectedPlayer('');
             }}
             disabled={!selectedPlayer}
@@ -247,8 +249,8 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
           <button
             onClick={() => {
               if (!selectedPlayer) return;
-              const playerIndex = parseInt(selectedPlayer.replace('p', '')) - 1;
-              addCard(teamSide, 'red', playerIndex);
+              const playerIndex = players.findIndex(p => p.id === selectedPlayer);
+              if (playerIndex >= 0) addCard(teamSide, 'red', playerIndex);
               setSelectedPlayer('');
             }}
             disabled={!selectedPlayer}

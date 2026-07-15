@@ -153,7 +153,7 @@ interface MatchState {
   isMatchActive: boolean;
   
   // Actions
-  createMatch: (homeTeam: Team, awayTeam: Team, sport: SportType) => void;
+  createMatch: (homeTeam: Team, awayTeam: Team, sport: SportType, halfDuration?: number) => void;
   startMatch: () => void;
   endHalf: () => void;
   completeMatch: () => void;
@@ -193,7 +193,7 @@ export const useMatchStore = create<MatchState>()(
       match: null,
       isMatchActive: false,
 
-      createMatch: (homeTeam: Team, awayTeam: Team, sport: SportType) => {
+      createMatch: (homeTeam: Team, awayTeam: Team, sport: SportType, halfDuration?: number) => {
         // Validate teams have players arrays
         const validatedHomePlayers = homeTeam.players && homeTeam.players.length > 0 
           ? homeTeam.players.map((p, i) => validatePlayer(p, i)).filter(Boolean) as Player[]
@@ -218,7 +218,7 @@ export const useMatchStore = create<MatchState>()(
           teamAway: { ...awayTeam, goals: 0, points: 0, players: validatedAwayPlayers },
           sport,
           status: 'draft',
-          halfDuration: 30,
+          halfDuration: halfDuration || 30,
           currentMinute: 0,
           currentHalf: 'first-half',
           events: [],
