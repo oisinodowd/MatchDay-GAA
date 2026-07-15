@@ -4,7 +4,7 @@ import { persist } from 'zustand/middleware';
 // Types
 export type MatchStatus = 'draft' | 'first-half' | 'halftime' | 'second-half' | 'completed' | 'postponed' | 'cancelled';
 export type SportType = 'gaelic-football' | 'hurling';
-export type EventTypes = 'score' | 'yellow_card' | 'black_card' | 'red_card' | 'substitution' | 'note' | 'free_taken' | 'point_wide' | 'goal_wide';
+export type EventTypes = 'score' | 'yellow_card' | 'black_card' | 'red_card' | 'substitution' | 'note' | 'free_taken' | 'point_wide' | 'goal_wide' | 'miss' | 'mark' | 'turnover';
 
 /**
  * Validate and sanitize a player object. Returns sanitized player or null if invalid.
@@ -122,8 +122,9 @@ export interface MatchEvent {
   minute: number;
   half: 'first-half' | 'second-half' | 'extra-time-1' | 'extra-time-2';
   details?: {
-    subtype?: 'goal' | 'point' | 'free' | '65-meter' | '40m-point';
+    subtype?: 'goal' | 'point' | 'free' | '65-meter' | '40m-point' | '45-meter';
     isTwoPoint?: boolean;
+    missType?: 'point_wide' | 'goal_wide';
     cardType?: 'yellow' | 'black' | 'red';
     playerOutIndex?: number;
     playerOnName?: string;
@@ -164,7 +165,14 @@ interface MatchState {
   updatePlayerByName: (teamSide: 'home' | 'away', playerName: string, updates: Partial<Player>) => void;
   
   // Scoring
-  addScore: (teamSide: 'home' | 'away', subtype: 'goal' | 'point' | 'free' | '65-meter' | '40m-point', playerIndex?: number, isTwoPoint?: boolean, locationX?: number, locationY?: number) => void;
+  addScore: (teamSide: 'home' | 'away', subtype: 'goal' | 'point' | 'free' | '65-meter' | '40m-point' | '45-meter', playerIndex?: number, isTwoPoint?: boolean, locationX?: number, locationY?: number) => void;
+  
+  // Missed shots (wides)
+  addMiss: (teamSide: 'home' | 'away', missType: 'point_wide' | 'goal_wide', playerIndex?: number, locationX?: number, locationY?: number) => void;
+  
+  // Possession metrics
+  addMark: (teamSide: 'home' | 'away', playerIndex?: number, locationX?: number, locationY?: number) => void;
+  addTurnover: (teamSide: 'home' | 'away', playerIndex?: number, locationX?: number, locationY?: number) => void;
   
   // Cards
   addCard: (teamSide: 'home' | 'away', cardType: 'yellow' | 'black' | 'red', playerIndex: number) => void;
@@ -323,7 +331,7 @@ export const useMatchStore = create<MatchState>()(
         }));
       },
 
-      addScore: (teamSide: 'home' | 'away', subtype: 'goal' | 'point' | 'free' | '65-meter' | '40m-point', playerIndex?: number, isTwoPoint = false, locationX?: number, locationY?: number) => {
+      addScore: (teamSide: 'home' | 'away', subtype: 'goal' | 'point' | 'free' | '65-meter' | '40m-point' | '45-meter', playerIndex?: number, isTwoPoint = false, locationX?: number, locationY?: number) => {
         set((state) => {
           if (!state.match) return state;
           
@@ -378,6 +386,82 @@ export const useMatchStore = create<MatchState>()(
           newMatch.events = [...newMatch.events, event];
           undoStack.push(event);
           
+          return { match: newMatch };
+        });
+      },
+
+      addMiss: (teamSide: 'home' | 'away', missType: 'point_wide' | 'goal_wide', playerIndex?: number, locationX?: number, locationY?: number) => {
+        set((state) => {
+          if (!state.match) return state;
+          
+          const newMatch = { ...state.match };
+          
+          // Validate playerIndex
+          const players = teamSide === 'home' ? [...newMatch.teamHome.players] : [...newMatch.teamAway.players];
+          const validPlayerIndex = playerIndex !== undefined && playerIndex >= 0 && playerIndex < players.length 
+            ? playerIndex 
+            : undefined;
+          
+          const event: MatchEvent = {
+            type: 'miss',
+            teamSide,
+            playerIndex: validPlayerIndex,
+            minute: newMatch.currentMinute,
+            half: newMatch.currentHalf,
+            details: { 
+              missType,
+              locationX,
+              locationY
+            }
+          };
+          
+          newMatch.events = [...newMatch.events, event];
+          undoStack.push(event);
+          
+          return { match: newMatch };
+        });
+      },
+
+      addMark: (teamSide, playerIndex, locationX, locationY) => {
+        set((state) => {
+          if (!state.match) return state;
+          const newMatch = { ...state.match };
+          const players = teamSide === 'home' ? [...newMatch.teamHome.players] : [...newMatch.teamAway.players];
+          const validPlayerIndex = playerIndex !== undefined && playerIndex >= 0 && playerIndex < players.length ? playerIndex : undefined;
+
+          const event: MatchEvent = {
+            type: 'mark',
+            teamSide,
+            playerIndex: validPlayerIndex,
+            minute: newMatch.currentMinute,
+            half: newMatch.currentHalf,
+            details: { locationX, locationY },
+          };
+
+          newMatch.events = [...newMatch.events, event];
+          undoStack.push(event);
+          return { match: newMatch };
+        });
+      },
+
+      addTurnover: (teamSide, playerIndex, locationX, locationY) => {
+        set((state) => {
+          if (!state.match) return state;
+          const newMatch = { ...state.match };
+          const players = teamSide === 'home' ? [...newMatch.teamHome.players] : [...newMatch.teamAway.players];
+          const validPlayerIndex = playerIndex !== undefined && playerIndex >= 0 && playerIndex < players.length ? playerIndex : undefined;
+
+          const event: MatchEvent = {
+            type: 'turnover',
+            teamSide,
+            playerIndex: validPlayerIndex,
+            minute: newMatch.currentMinute,
+            half: newMatch.currentHalf,
+            details: { locationX, locationY },
+          };
+
+          newMatch.events = [...newMatch.events, event];
+          undoStack.push(event);
           return { match: newMatch };
         });
       },
@@ -533,6 +617,12 @@ export const useMatchStore = create<MatchState>()(
                 else awayTeam.players = players;
               }
             }
+          } else if (lastEvent.type === 'miss') {
+            // Reverse a miss/wide — just remove the event, no stat changes needed
+          } else if (lastEvent.type === 'mark') {
+            // Reverse a mark — just remove the event, no stat changes needed
+          } else if (lastEvent.type === 'turnover') {
+            // Reverse a turnover — just remove the event, no stat changes needed
           } else if (lastEvent.type === 'substitution' && lastEvent.details?.playerOnName !== undefined) {
             // Reverse substitution - mark incoming player as sub again, outgoing as not substituted
             const players = lastEvent.teamSide === 'home' ? [...homeTeam.players] : [...awayTeam.players];

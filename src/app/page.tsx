@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useMatchStore } from '@/stores/match-store';
 import { useSettingsStore } from '@/stores/settings-store';
-import { ArrowRight, Play, Users, Trash2, Loader2, Plus } from 'lucide-react';
+import { ArrowRight, Play, Users, Trash2, Loader2, Plus, Calendar } from 'lucide-react';
 import { db, type SavedTeamSheet } from '@/lib/db/matchday-db';
 
 export default function HomePage() {
@@ -75,12 +75,40 @@ export default function HomePage() {
       )}
 
       {/* New Match Button */}
-      <Link href="/matches/new" className="block mb-8">
+      <Link href="/matches/new" className="block mb-4">
         <button className={`btn-primary w-full py-3.5 text-center ${rainMode ? 'text-rain-md min-h-[60px]' : ''}`}>
           <span className="flex items-center justify-center gap-2">
             <Play className="w-4 h-4" />
             New Match
           </span>
+        </button>
+      </Link>
+
+      {/* Sligo GAA Fixtures Button */}
+      <Link href="/matches/sligo-fixtures" className="block mb-4">
+        <button 
+          style={{
+            width: '100%', padding: '14px', borderRadius: '12px',
+            border: '2px solid #000',
+            background: '#ffffff',
+            color: '#111827',
+            fontSize: '15px', fontWeight: 700,
+            cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+            transition: 'all 0.15s ease',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = '#f9fafb'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = '#ffffff'; }}
+        >
+          <span style={{
+            width: '24px', height: '24px', borderRadius: '6px',
+            background: 'linear-gradient(135deg, #000000 50%, #ffffff 50%)',
+            border: '1.5px solid #d1d5db',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '10px', fontWeight: 900, color: '#000',
+          }}>S</span>
+          <Calendar className="w-4 h-4" />
+          Sligo GAA Fixtures
         </button>
       </Link>
 

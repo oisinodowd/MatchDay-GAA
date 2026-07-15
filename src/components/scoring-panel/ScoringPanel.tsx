@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useMatchStore, Player } from '@/stores/match-store';
 import { useSettingsStore } from '@/stores/settings-store';
-import { Target, Crosshair, Trophy, Square, SquareSlash, ShieldAlert, MapPin } from 'lucide-react';
+import { Target, Crosshair, Trophy, Flag, GitBranch, XCircle, ArrowUpRight, RefreshCw } from 'lucide-react';
 import InteractivePitchMap from './InteractivePitchMap';
 
 interface ScoringPanelProps {
@@ -11,8 +11,17 @@ interface ScoringPanelProps {
   teamName: string;
 }
 
+type PendingAction = 
+  | { type: 'score'; subtype: 'point' | 'two_point' | 'goal' | 'free' | '45-meter' }
+  | { type: 'miss'; missType: 'point_wide' | 'goal_wide' }
+  | { type: 'mark' }
+  | { type: 'turnover' };
+
 export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) {
   const addScore = useMatchStore((s) => s.addScore);
+  const addMiss = useMatchStore((s) => s.addMiss);
+  const addMark = useMatchStore((s) => s.addMark);
+  const addTurnover = useMatchStore((s) => s.addTurnover);
   const addCard = useMatchStore((s) => s.addCard);
   const match = useMatchStore((s) => s.match);
   const accessibilityMode = useSettingsStore((s) => s.accessibilityMode);
@@ -20,12 +29,10 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
   const rainMode = accessibilityMode === 'rain-mode';
 
   const [selectedPlayer, setSelectedPlayer] = useState<string>('');
-  const [showConfirmation, setShowConfirmation] = useState(false);
-  const [pendingScore, setPendingScore] = useState<'point' | 'two_point' | 'goal' | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   
   // Interactive pitch map state for location selection
   const [showPitchMap, setShowPitchMap] = useState(false);
-  const [pendingLocation, setPendingLocation] = useState<{ x: number; y: number } | null>(null);
 
   // Get real team players from match store
   const teamPlayers = useMemo(() => {
@@ -34,7 +41,7 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
     return team.players || [];
   }, [match, teamSide]);
 
-  // Fallback to mock players if no real players exist (for backward compatibility)
+  // Fallback to mock players if no real players exist
   const players: Player[] = teamPlayers.length > 0 
     ? teamPlayers 
     : Array.from({ length: 21 }, (_, i) => ({
@@ -45,86 +52,77 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
         goals: 0, points: 0, yellowCards: 0, blackCards: 0, redCards: 0, isSubstituted: false,
       }));
 
-  const handleScoreClick = (type: 'point' | 'two_point' | 'goal') => {
-    if (!selectedPlayer) {
-      return; // Need player selection for individual scores
-    }
-    
-    // Show pitch map for location selection before recording
-    setPendingLocation(null);
+  const handleActionClick = (action: PendingAction) => {
+    if (!selectedPlayer) return;
+    setPendingAction(action);
     setShowPitchMap(true);
   };
 
-  const handleScore = (type: 'point' | 'two_point' | 'goal') => {
-    if (!selectedPlayer) {
-      return; // Need player selection for individual scores
-    }
+  const executeAction = (x: number, y: number) => {
+    if (!selectedPlayer || !pendingAction) return;
 
-    let subtype: 'goal' | 'point' | 'free' | '65-meter' | '40m-point' = 'point';
-    let isTwoPoint = false;
-
-    if (type === 'goal') {
-      subtype = 'goal';
-    } else if (type === 'two_point') {
-      subtype = '40m-point';
-      isTwoPoint = true;
-    } else {
-      subtype = 'point';
-    }
-
-    const playerIndex = selectedPlayer ? players.findIndex(p => p.id === selectedPlayer) : -1;
+    const playerIndex = players.findIndex(p => p.id === selectedPlayer);
     const validIndex = playerIndex >= 0 ? playerIndex : undefined;
 
-    addScore(teamSide, subtype, validIndex, isTwoPoint);
+    if (pendingAction.type === 'score') {
+      // Map UI action to store subtype
+      let subtype: 'goal' | 'point' | 'free' | '65-meter' | '40m-point' | '45-meter';
+      let isTwoPoint = false;
 
-    // Reset selection after scoring (one-tap flow: select player → tap score type)
-    setSelectedPlayer('');
-  };
+      switch (pendingAction.subtype) {
+        case 'goal':
+          subtype = 'goal';
+          break;
+        case 'two_point':
+          subtype = '40m-point';
+          isTwoPoint = true;
+          break;
+        case 'free':
+          subtype = 'free';
+          break;
+        case '45-meter':
+          subtype = '45-meter';
+          break;
+        case 'point':
+        default:
+          subtype = 'point';
+          break;
+      }
 
-  const handleLocationSelect = (x: number, y: number) => {
-    setPendingLocation({ x, y });
-    
-    if (!selectedPlayer || !pendingScore) return;
-    
-    let subtype: 'goal' | 'point' | 'free' | '65-meter' | '40m-point' = 'point';
-    let isTwoPoint = false;
-
-    if (pendingScore === 'goal') {
-      subtype = 'goal';
-    } else if (pendingScore === 'two_point') {
-      subtype = '40m-point';
-      isTwoPoint = true;
-    } else {
-      subtype = 'point';
+      addScore(teamSide, subtype, validIndex, isTwoPoint, x, y);
+    } else if (pendingAction.type === 'miss') {
+      addMiss(teamSide, pendingAction.missType, validIndex, x, y);
+    } else if (pendingAction.type === 'mark') {
+      addMark(teamSide, validIndex, x, y);
+    } else if (pendingAction.type === 'turnover') {
+      addTurnover(teamSide, validIndex, x, y);
     }
 
-    const playerIndex = selectedPlayer ? players.findIndex(p => p.id === selectedPlayer) : -1;
-    const validIndex = playerIndex >= 0 ? playerIndex : undefined;
-
-    // Store percentage coordinates directly (0-100) for display on pitch image
-    addScore(teamSide, subtype, validIndex, isTwoPoint, x, y);
-
-    // Reset selection after scoring (one-tap flow: select player → tap score type)
+    // Reset
     setSelectedPlayer('');
     setShowPitchMap(false);
-    setPendingLocation(null);
-    setPendingScore(null);
+    setPendingAction(null);
   };
 
   const handleClosePitchMap = () => {
     setShowPitchMap(false);
-    setPendingLocation(null);
-    setPendingScore(null);
+    setPendingAction(null);
+  };
+
+  // Score without player (quick team-only score)
+  const quickScore = (type: 'point' | 'goal') => {
+    const subtype = type === 'goal' ? 'goal' as const : 'point' as const;
+    addScore(teamSide, subtype, undefined, false);
   };
 
   return (
     <div className="card-elevated p-5">
       {/* Team Header */}
       <h3 className={`mb-4 font-semibold ${rainMode ? 'text-rain-md' : 'text-base'} text-gaa-green`}>
-        {teamName} <span className={`font-normal ${'text-gray-500'}`}>• {teamSide === 'home' ? 'Home' : 'Away'}</span>
+        {teamName} <span className={`font-normal text-gray-500`}>• {teamSide === 'home' ? 'Home' : 'Away'}</span>
       </h3>
 
-      {/* Player Selector — tap to select, then tap score type (UR-004–5) */}
+      {/* Player Selector */}
       <div className="mb-4">
         <label className={`block mb-1.5 text-xs font-medium ${rainMode ? 'text-rain-sm' : ''} text-gray-600`}>
           Select Player
@@ -143,68 +141,211 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
         </select>
       </div>
 
-      {/* Score Type Buttons — one tap to record (UR-004–5) */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        {/* Point Button */}
+      {/* ── Scores From Play ── */}
+      <p className={`mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-400`}>
+        Scores from Play
+      </p>
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        {/* Point from Play */}
         <button
-          onClick={() => { setPendingScore('point'); handleScoreClick('point'); }}
+          onClick={() => handleActionClick({ type: 'score', subtype: 'point' })}
           disabled={!selectedPlayer}
-          className={`flex flex-col items-center justify-center rounded-xl py-5 transition ${
-            selectedPlayer ? 'hover:bg-blue-100 active:scale-[0.98]' : 'bg-gray-100 cursor-not-allowed'
-          } ${rainMode ? 'min-h-[60px]' : ''}`}
+          style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '12px 8px', borderRadius: '12px',
+            background: selectedPlayer ? '#eff6ff' : '#f3f4f6',
+            border: 'none', cursor: selectedPlayer ? 'pointer' : 'not-allowed',
+            transition: 'all 0.15s ease', opacity: selectedPlayer ? 1 : 0.5,
+          }}
         >
-          <Target className={`mb-2 ${selectedPlayer ? 'text-blue-600' : 'text-gray-400'} ${rainMode ? 'w-8 h-8' : 'w-6 h-6'}`} />
-          <span className={`font-semibold ${rainMode ? 'text-base' : 'text-sm'} ${selectedPlayer ? 'text-blue-700' : ''}`}>Point</span>
-          <span className={`mt-1 ${'text-xs'} text-gray-500`}>+1 pt</span>
+          <Target style={{ width: '22px', height: '22px', color: '#2563eb', marginBottom: '4px' }} />
+          <span style={{ fontSize: '13px', fontWeight: 700, color: '#1e40af' }}>Point</span>
+          <span style={{ fontSize: '10px', color: '#6b7280' }}>+1 pt</span>
         </button>
 
-        {/* Two-Point Button (2025 rule — UR-034) */}
+        {/* 2-Point (40m+) */}
         <button
-          onClick={() => { setPendingScore('two_point'); handleScoreClick('two_point'); }}
+          onClick={() => handleActionClick({ type: 'score', subtype: 'two_point' })}
           disabled={!selectedPlayer}
-          className={`flex flex-col items-center justify-center rounded-xl py-5 transition ${
-            selectedPlayer ? 'hover:bg-orange-100 active:scale-[0.98]' : 'bg-gray-100 cursor-not-allowed'
-          } ${rainMode ? 'min-h-[60px]' : ''}`}
+          style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '12px 8px', borderRadius: '12px',
+            background: selectedPlayer ? '#fff7ed' : '#f3f4f6',
+            border: 'none', cursor: selectedPlayer ? 'pointer' : 'not-allowed',
+            transition: 'all 0.15s ease', opacity: selectedPlayer ? 1 : 0.5,
+          }}
         >
-          <Crosshair className={`mb-2 ${selectedPlayer ? 'text-orange-600' : 'text-gray-400'} ${rainMode ? 'w-8 h-8' : 'w-6 h-6'}`} />
-          <span className={`font-semibold ${rainMode ? 'text-base' : 'text-sm'} ${selectedPlayer ? 'text-orange-700' : ''}`}>2 Pt</span>
-          <span className={`mt-1 ${'text-xs'} text-gray-500`}>40m+</span>
+          <Crosshair style={{ width: '22px', height: '22px', color: '#ea580c', marginBottom: '4px' }} />
+          <span style={{ fontSize: '13px', fontWeight: 700, color: '#9a3412' }}>2-Point</span>
+          <span style={{ fontSize: '10px', color: '#6b7280' }}>40m+ (+2)</span>
         </button>
 
-        {/* Goal Button */}
+        {/* Goal from Play */}
         <button
-          onClick={() => { setPendingScore('goal'); handleScoreClick('goal'); }}
+          onClick={() => handleActionClick({ type: 'score', subtype: 'goal' })}
           disabled={!selectedPlayer}
-          className={`flex flex-col items-center justify-center rounded-xl py-5 transition ${
-            selectedPlayer ? 'hover:bg-green-100 active:scale-[0.98]' : 'bg-gray-100 cursor-not-allowed'
-          } ${rainMode ? 'min-h-[60px]' : ''}`}
+          style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '12px 8px', borderRadius: '12px',
+            background: selectedPlayer ? '#f0fdf4' : '#f3f4f6',
+            border: 'none', cursor: selectedPlayer ? 'pointer' : 'not-allowed',
+            transition: 'all 0.15s ease', opacity: selectedPlayer ? 1 : 0.5,
+          }}
         >
-          <Trophy className={`mb-2 ${selectedPlayer ? 'text-green-600' : 'text-gray-400'} ${rainMode ? 'w-8 h-8' : 'w-6 h-6'}`} />
-          <span className={`font-semibold ${rainMode ? 'text-base' : 'text-sm'} ${selectedPlayer ? 'text-green-700' : ''}`}>Goal</span>
-          <span className={`mt-1 ${'text-xs'} text-gray-500`}>+3 pts</span>
+          <Trophy style={{ width: '22px', height: '22px', color: '#16a34a', marginBottom: '4px' }} />
+          <span style={{ fontSize: '13px', fontWeight: 700, color: '#166534' }}>Goal</span>
+          <span style={{ fontSize: '10px', color: '#6b7280' }}>+3 pts</span>
+        </button>
+      </div>
+
+      {/* ── Placed Balls & Misses ── */}
+      <p className={`mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-400`}>
+        Placed Balls &amp; Misses
+      </p>
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        {/* Free (Point) */}
+        <button
+          onClick={() => handleActionClick({ type: 'score', subtype: 'free' })}
+          disabled={!selectedPlayer}
+          style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '12px 8px', borderRadius: '12px',
+            background: selectedPlayer ? '#fefce8' : '#f3f4f6',
+            border: 'none', cursor: selectedPlayer ? 'pointer' : 'not-allowed',
+            transition: 'all 0.15s ease', opacity: selectedPlayer ? 1 : 0.5,
+          }}
+        >
+          <Flag style={{ width: '22px', height: '22px', color: '#ca8a04', marginBottom: '4px' }} />
+          <span style={{ fontSize: '13px', fontWeight: 700, color: '#854d0e' }}>Free</span>
+          <span style={{ fontSize: '10px', color: '#6b7280' }}>+1 pt</span>
+        </button>
+
+        {/* 45' Kick */}
+        <button
+          onClick={() => handleActionClick({ type: 'score', subtype: '45-meter' })}
+          disabled={!selectedPlayer}
+          style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '12px 8px', borderRadius: '12px',
+            background: selectedPlayer ? '#f5f3ff' : '#f3f4f6',
+            border: 'none', cursor: selectedPlayer ? 'pointer' : 'not-allowed',
+            transition: 'all 0.15s ease', opacity: selectedPlayer ? 1 : 0.5,
+          }}
+        >
+          <GitBranch style={{ width: '22px', height: '22px', color: '#7c3aed', marginBottom: '4px' }} />
+          <span style={{ fontSize: '13px', fontWeight: 700, color: '#5b21b6' }}>45&apos;</span>
+          <span style={{ fontSize: '10px', color: '#6b7280' }}>Set piece</span>
+        </button>
+
+        {/* Wide (Point Miss) */}
+        <button
+          onClick={() => handleActionClick({ type: 'miss', missType: 'point_wide' })}
+          disabled={!selectedPlayer}
+          style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '12px 8px', borderRadius: '12px',
+            background: selectedPlayer ? '#fef2f2' : '#f3f4f6',
+            border: 'none', cursor: selectedPlayer ? 'pointer' : 'not-allowed',
+            transition: 'all 0.15s ease', opacity: selectedPlayer ? 1 : 0.5,
+          }}
+        >
+          <XCircle style={{ width: '22px', height: '22px', color: '#ef4444', marginBottom: '4px' }} />
+          <span style={{ fontSize: '13px', fontWeight: 700, color: '#991b1b' }}>Wide</span>
+          <span style={{ fontSize: '10px', color: '#6b7280' }}>Point miss</span>
+        </button>
+
+        {/* Goal Miss */}
+        <button
+          onClick={() => handleActionClick({ type: 'miss', missType: 'goal_wide' })}
+          disabled={!selectedPlayer}
+          style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '12px 8px', borderRadius: '12px',
+            background: selectedPlayer ? '#fff1f2' : '#f3f4f6',
+            border: 'none', cursor: selectedPlayer ? 'pointer' : 'not-allowed',
+            transition: 'all 0.15s ease', opacity: selectedPlayer ? 1 : 0.5,
+          }}
+        >
+          <span style={{ fontSize: '20px', lineHeight: 1, marginBottom: '4px' }}>🥅</span>
+          <span style={{ fontSize: '13px', fontWeight: 700, color: '#9f1239' }}>Goal Miss</span>
+          <span style={{ fontSize: '10px', color: '#6b7280' }}>Off target</span>
+        </button>
+      </div>
+
+      {/* ── Possession & Defence ── */}
+      <p className={`mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-400`}>
+        Possession &amp; Defence
+      </p>
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        {/* Mark (clean catch) */}
+        <button
+          onClick={() => handleActionClick({ type: 'mark' })}
+          disabled={!selectedPlayer}
+          style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '12px 8px', borderRadius: '12px',
+            background: selectedPlayer ? '#f0fdf4' : '#f3f4f6',
+            border: 'none', cursor: selectedPlayer ? 'pointer' : 'not-allowed',
+            transition: 'all 0.15s ease', opacity: selectedPlayer ? 1 : 0.5,
+          }}
+        >
+          <ArrowUpRight style={{ width: '22px', height: '22px', color: '#16a34a', marginBottom: '4px' }} />
+          <span style={{ fontSize: '13px', fontWeight: 700, color: '#166534' }}>Mark</span>
+          <span style={{ fontSize: '10px', color: '#6b7280' }}>Clean catch</span>
+        </button>
+
+        {/* Turnover */}
+        <button
+          onClick={() => handleActionClick({ type: 'turnover' })}
+          disabled={!selectedPlayer}
+          style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '12px 8px', borderRadius: '12px',
+            background: selectedPlayer ? '#eff6ff' : '#f3f4f6',
+            border: 'none', cursor: selectedPlayer ? 'pointer' : 'not-allowed',
+            transition: 'all 0.15s ease', opacity: selectedPlayer ? 1 : 0.5,
+          }}
+        >
+          <RefreshCw style={{ width: '22px', height: '22px', color: '#2563eb', marginBottom: '4px' }} />
+          <span style={{ fontSize: '13px', fontWeight: 700, color: '#1e40af' }}>Turnover</span>
+          <span style={{ fontSize: '10px', color: '#6b7280' }}>Won / Lost</span>
         </button>
       </div>
 
       {/* Interactive Pitch Map Modal */}
       {showPitchMap && (
         <InteractivePitchMap
-          onSelectLocation={handleLocationSelect}
+          onSelectLocation={executeAction}
           onClose={handleClosePitchMap}
         />
       )}
 
-      {/* UR-038: Team-only score (no player assigned) */}
-      <button
-        onClick={() => {
-          addScore(teamSide, 'point', undefined, false);
-        }}
-        className={`w-full text-center ${'text-xs'} font-medium ${rainMode ? 'text-rain-sm' : ''} text-gray-500 hover:text-gray-700 underline transition-colors`}
-      >
-        Score without player (assign later)
-      </button>
+      {/* Quick team-only scores */}
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => quickScore('point')}
+          style={{
+            flex: 1, textAlign: 'center', fontSize: '11px', fontWeight: 500,
+            color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer',
+            textDecoration: 'underline', padding: '4px',
+          }}
+        >
+          +1 Team Point
+        </button>
+        <button
+          onClick={() => quickScore('goal')}
+          style={{
+            flex: 1, textAlign: 'center', fontSize: '11px', fontWeight: 500,
+            color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer',
+            textDecoration: 'underline', padding: '4px',
+          }}
+        >
+          +3 Team Goal
+        </button>
+      </div>
 
-      {/* Discipline Section — Cards (UR-063–71) */}
-      <div className={`mt-5 pt-4 border-t ${'border-gray-200'}`}>
+      {/* Discipline Section — Cards */}
+      <div className={`pt-4 border-t border-gray-200`}>
         <h4 className={`mb-3 text-xs font-semibold uppercase tracking-wider ${rainMode ? 'text-rain-sm' : ''} text-gray-500`}>
           Discipline
         </h4>
@@ -224,7 +365,6 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
           >
             <div className={`w-7 h-10 rounded mb-2 ${selectedPlayer ? 'bg-yellow-400' : 'bg-gray-300'} border-2 border-black`}></div>
             <span className={`font-semibold text-sm ${rainMode ? 'text-rain-sm' : ''} ${selectedPlayer ? 'text-yellow-700' : ''}`}>Yellow</span>
-            <span className={`mt-0.5 ${'text-xs'} text-gray-500`}>Caution</span>
           </button>
 
           {/* Black Card */}
@@ -242,7 +382,6 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
           >
             <div className={`w-7 h-10 rounded mb-2 ${selectedPlayer ? 'bg-black' : 'bg-gray-300'} border-2 border-white`}></div>
             <span className={`font-semibold text-sm ${rainMode ? 'text-rain-sm' : ''} ${selectedPlayer ? 'text-gray-700' : ''}`}>Black</span>
-            <span className={`mt-0.5 ${'text-xs'} text-gray-500`}>Send-off</span>
           </button>
 
           {/* Red Card */}
@@ -260,7 +399,6 @@ export default function ScoringPanel({ teamSide, teamName }: ScoringPanelProps) 
           >
             <div className={`w-7 h-10 rounded mb-2 ${selectedPlayer ? 'bg-red-600' : 'bg-gray-300'} border-2 border-white`}></div>
             <span className={`font-semibold text-sm ${rainMode ? 'text-rain-sm' : ''} ${selectedPlayer ? 'text-red-700' : ''}`}>Red</span>
-            <span className={`mt-0.5 ${'text-xs'} text-gray-500`}>Dismissal</span>
           </button>
         </div>
       </div>

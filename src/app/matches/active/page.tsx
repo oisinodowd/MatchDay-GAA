@@ -281,32 +281,13 @@ export default function ActiveMatchPage() {
       </div>
 
       {/* Event Timeline */}
-      <div className="mt-6 card-elevated p-5">
-        <h3 className={`mb-3 ${'text-sm'} font-semibold uppercase tracking-wider text-gray-500`}>
-          Event Timeline
-        </h3>
-        {match.events.length === 0 ? (
-          <p className={`text-sm ${'text-gray-500'} italic`}>No events recorded yet.</p>
-        ) : (
-          <div className="max-h-48 overflow-y-auto space-y-1.5">
-            {[...match.events].reverse().map((event, index) => (
-              <div key={index} className={`flex items-center gap-2 text-sm border-b last:border-0 pb-1.5 ${'border-gray-100'}`}>
-                <span className={`text-xs font-mono ${'text-gray-400'} w-8`}>{event.minute}&apos;</span>
-                <span className={`font-medium flex-1 truncate ${event.teamSide === 'home' ? `${'text-blue-600'}` : `${'text-red-600'}`} `}>
-                  {event.teamSide === 'home' ? homeTeam.name : awayTeam.name}
-                </span>
-                <span className={`text-xs ${'text-gray-600'} font-medium`}>
-                  {event.type === 'score' && `Score (${event.details?.subtype || 'point'})`}
-                  {event.type === 'yellow_card' && 'Yellow Card'}
-                  {event.type === 'black_card' && 'Black Card'}
-                  {event.type === 'red_card' && 'Red Card'}
-                  {event.type === 'substitution' && 'Substitution'}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <MatchTimeline
+        events={match.events}
+        homeTeamName={homeTeam.name}
+        awayTeamName={awayTeam.name}
+        homePlayers={homeTeam.players}
+        awayPlayers={awayTeam.players}
+      />
 
       {/* Reset Confirmation Modal */}
       {showResetConfirm && (
@@ -334,6 +315,293 @@ export default function ActiveMatchPage() {
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── Match Timeline Component ──
+
+const FILTERS = [
+  { key: 'all', label: 'All' },
+  { key: 'scores', label: 'Scores' },
+  { key: 'misses', label: 'Misses' },
+  { key: 'cards', label: 'Cards' },
+  { key: 'possession', label: 'Possession' },
+] as const;
+
+type FilterKey = (typeof FILTERS)[number]['key'];
+
+interface TimelineEventConfig {
+  icon: string;
+  label: string;
+  color: string;
+  bg: string;
+}
+
+function getEventConfig(event: import('@/stores/match-store').MatchEvent): TimelineEventConfig {
+  const t = event.type;
+  if (t === 'score') {
+    const sub = event.details?.subtype;
+    if (sub === 'goal') return { icon: '⚽', label: 'Goal', color: '#16a34a', bg: '#f0fdf4' };
+    if (sub === 'free') return { icon: '🎯', label: 'Free', color: '#ca8a04', bg: '#fefce8' };
+    if (sub === '45-meter' || sub === '65-meter') return { icon: '📍', label: "45'", color: '#7c3aed', bg: '#f5f3ff' };
+    if (event.details?.isTwoPoint) return { icon: '🎯', label: '2-Point', color: '#ea580c', bg: '#fff7ed' };
+    return { icon: '🏐', label: 'Point', color: '#2563eb', bg: '#eff6ff' };
+  }
+  if (t === 'miss') {
+    if (event.details?.missType === 'goal_wide') return { icon: '🥅', label: 'Goal Miss', color: '#e11d48', bg: '#fff1f2' };
+    return { icon: '✗', label: 'Wide', color: '#dc2626', bg: '#fef2f2' };
+  }
+  if (t === 'mark') return { icon: '👐', label: 'Mark', color: '#16a34a', bg: '#f0fdf4' };
+  if (t === 'turnover') return { icon: '🔄', label: 'Turnover', color: '#2563eb', bg: '#eff6ff' };
+  if (t === 'yellow_card') return { icon: '🟨', label: 'Yellow', color: '#ca8a04', bg: '#fefce8' };
+  if (t === 'black_card') return { icon: '⬛', label: 'Black', color: '#374151', bg: '#f3f4f6' };
+  if (t === 'red_card') return { icon: '🟥', label: 'Red', color: '#dc2626', bg: '#fef2f2' };
+  if (t === 'substitution') return { icon: '↔️', label: 'Sub', color: '#6b7280', bg: '#f9fafb' };
+  return { icon: '📋', label: t, color: '#6b7280', bg: '#f9fafb' };
+}
+
+function getPlayerName(
+  teamSide: 'home' | 'away',
+  playerIndex: number | undefined,
+  homePlayers: import('@/stores/match-store').Player[],
+  awayPlayers: import('@/stores/match-store').Player[]
+): string | null {
+  if (playerIndex === undefined) return null;
+  const players = teamSide === 'home' ? homePlayers : awayPlayers;
+  const player = players[playerIndex];
+  if (!player) return null;
+  return player.name || `#${player.number}`;
+}
+
+function MatchTimeline({
+  events,
+  homeTeamName,
+  awayTeamName,
+  homePlayers,
+  awayPlayers,
+}: {
+  events: import('@/stores/match-store').MatchEvent[];
+  homeTeamName: string;
+  awayTeamName: string;
+  homePlayers: import('@/stores/match-store').Player[];
+  awayPlayers: import('@/stores/match-store').Player[];
+}) {
+  const [filter, setFilter] = useState<FilterKey>('all');
+
+  if (events.length === 0) {
+    return (
+      <div className="mt-6 card-elevated p-5">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-3">
+          Event Timeline
+        </h3>
+        <p className="text-sm text-gray-500 italic">No events recorded yet.</p>
+      </div>
+    );
+  }
+
+  // Group events by half
+  const firstHalf = events.filter(e => e.half === 'first-half');
+  const secondHalf = events.filter(e => e.half === 'second-half');
+
+  // Filter by type
+  const filterEvents = (list: typeof events) => {
+    if (filter === 'all') return list;
+    if (filter === 'scores') return list.filter(e => e.type === 'score');
+    if (filter === 'misses') return list.filter(e => e.type === 'miss');
+    if (filter === 'cards') return list.filter(e => ['yellow_card', 'black_card', 'red_card'].includes(e.type));
+    if (filter === 'possession') return list.filter(e => e.type === 'mark' || e.type === 'turnover');
+    return list;
+  };
+
+  const filteredFirstHalf = filterEvents(firstHalf);
+  const filteredSecondHalf = filterEvents(secondHalf);
+
+  return (
+    <div className="mt-6 card-elevated p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500">
+          Event Timeline
+        </h3>
+        <span className="text-xs text-gray-400 font-medium">{events.length} events</span>
+      </div>
+
+      {/* Filter Pills */}
+      <div className="flex gap-1.5 mb-4 flex-wrap">
+        {FILTERS.map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setFilter(key as FilterKey)}
+            style={{
+              padding: '4px 12px',
+              borderRadius: '20px',
+              border: 'none',
+              fontSize: '11px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            background: filter === (key as FilterKey) ? '#166534' : '#f3f4f6',
+            color: filter === (key as FilterKey) ? '#ffffff' : '#6b7280',
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="max-h-96 overflow-y-auto">
+        {/* First Half */}
+        {filteredFirstHalf.length > 0 && (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="h-px flex-1 bg-gray-200" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-2">
+                1st Half
+              </span>
+              <div className="h-px flex-1 bg-gray-200" />
+            </div>
+            {filteredFirstHalf.map((event, idx) => (
+              <TimelineRow
+                key={`1h-${idx}`}
+                event={event}
+                teamName={event.teamSide === 'home' ? homeTeamName : awayTeamName}
+                playerName={getPlayerName(event.teamSide, event.playerIndex, homePlayers, awayPlayers)}
+                config={getEventConfig(event)}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Second Half */}
+        {filteredSecondHalf.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="h-px flex-1 bg-gray-200" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-2">
+                2nd Half
+              </span>
+              <div className="h-px flex-1 bg-gray-200" />
+            </div>
+            {filteredSecondHalf.map((event, idx) => (
+              <TimelineRow
+                key={`2h-${idx}`}
+                event={event}
+                teamName={event.teamSide === 'home' ? homeTeamName : awayTeamName}
+                playerName={getPlayerName(event.teamSide, event.playerIndex, homePlayers, awayPlayers)}
+                config={getEventConfig(event)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TimelineRow({
+  event,
+  teamName,
+  playerName,
+  config,
+}: {
+  event: import('@/stores/match-store').MatchEvent;
+  teamName: string;
+  playerName: string | null;
+  config: TimelineEventConfig;
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '10px',
+        padding: '8px 10px',
+        borderRadius: '10px',
+        background: config.bg,
+        marginBottom: '4px',
+        transition: 'background 0.15s ease',
+      }}
+    >
+      {/* Minute badge */}
+      <span
+        style={{
+          flexShrink: 0,
+          width: '32px',
+          height: '22px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: '6px',
+          fontSize: '11px',
+          fontWeight: 700,
+          fontFamily: 'monospace',
+          background: '#ffffff',
+          color: config.color,
+          border: `1px solid ${config.color}30`,
+        }}
+      >
+        {event.minute}&apos;
+      </span>
+
+      {/* Event icon */}
+      <span style={{ flexShrink: 0, fontSize: '16px', lineHeight: '22px' }}>
+        {config.icon}
+      </span>
+
+      {/* Event label */}
+      <span
+        style={{
+          flexShrink: 0,
+          fontSize: '11px',
+          fontWeight: 700,
+          color: config.color,
+          minWidth: '56px',
+          lineHeight: '22px',
+        }}
+      >
+        {config.label}
+      </span>
+
+      {/* Player name */}
+      {playerName && (
+        <span
+          style={{
+            fontSize: '12px',
+            fontWeight: 600,
+            color: '#1f2937',
+            lineHeight: '22px',
+          }}
+        >
+          {playerName}
+        </span>
+      )}
+
+      {/* Team name (right-aligned) */}
+      <span
+        style={{
+          marginLeft: 'auto',
+          fontSize: '10px',
+          fontWeight: 600,
+          color: event.teamSide === 'home' ? '#2563eb' : '#dc2626',
+          lineHeight: '22px',
+          flexShrink: 0,
+        }}
+      >
+        {teamName}
+      </span>
+
+      {/* Substitution detail */}
+      {event.type === 'substitution' && event.details?.playerOnName && (
+        <span
+          style={{
+            fontSize: '10px',
+            color: '#6b7280',
+            lineHeight: '22px',
+          }}
+        >
+          → {event.details.playerOnName}
+        </span>
       )}
     </div>
   );

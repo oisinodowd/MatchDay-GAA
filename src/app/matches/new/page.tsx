@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useMatchStore, Player, Team } from '@/stores/match-store';
 import { useSettingsStore } from '@/stores/settings-store';
@@ -28,20 +28,29 @@ const COMPETITIONS = [
   { value: 'connaught_sfc', label: 'Connacht Senior Football Championship' },
 ];
 
-export default function NewMatchPage() {
+function NewMatchPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const createMatch = useMatchStore((s) => s.createMatch);
   const accessibilityMode = useSettingsStore((s) => s.accessibilityMode);
 
   const rainMode = accessibilityMode === 'rain-mode';
 
-  const [sport, setSport] = useState<'gaelic-football' | 'hurling'>('gaelic-football');
+  // Read pre-filled fixture data from query params (set by Sligo Fixtures page)
+  const fixtureHome = searchParams.get('home') || '';
+  const fixtureAway = searchParams.get('away') || '';
+  const fixtureVenue = searchParams.get('venue') || '';
+  const fixtureCompetition = searchParams.get('competition') || '';
+  const fixtureSport = (searchParams.get('sport') as 'gaelic-football' | 'hurling') || 'gaelic-football';
+  const fromFixture = searchParams.get('from') === 'sligo-fixture';
+
+  const [sport, setSport] = useState<'gaelic-football' | 'hurling'>(fixtureSport);
   const [halfDuration, setHalfDuration] = useState<number>(35);
-  const [homeTeamName, setHomeTeamName] = useState('');
-  const [awayTeamName, setAwayTeamName] = useState('');
-  const [venue, setVenue] = useState('');
+  const [homeTeamName, setHomeTeamName] = useState(fixtureHome);
+  const [awayTeamName, setAwayTeamName] = useState(fixtureAway);
+  const [venue, setVenue] = useState(fixtureVenue);
   const [referee, setReferee] = useState('');
-  const [competition, setCompetition] = useState('');
+  const [competition, setCompetition] = useState(fixtureCompetition);
   
   // Team sheet state
   const [homePlayers, setHomePlayers] = useState<Player[]>([]);
@@ -160,6 +169,22 @@ export default function NewMatchPage() {
         <p className={`mt-1 ${rainMode ? 'text-rain-sm' : 'text-sm'} text-gray-500`}>
           Set up a match in under 60 seconds
         </p>
+
+        {/* Sligo Fixture Banner */}
+        {fromFixture && (
+          <div style={{
+            marginTop: '12px',
+            padding: '10px 14px',
+            borderRadius: '10px',
+            background: '#f0fdf4',
+            border: '1px solid #bbf7d0',
+            display: 'flex', alignItems: 'center', gap: '8px',
+            fontSize: '13px', fontWeight: 600, color: '#166534',
+          }}>
+            <span style={{ fontSize: '18px' }}>📋</span>
+            Pre-filled from Sligo GAA fixtures — add team sheets and create match
+          </div>
+        )}
       </div>
 
       {/* Sport Selection */}
@@ -421,5 +446,13 @@ export default function NewMatchPage() {
         </p>
       )}
     </div>
+  );
+}
+
+export default function NewMatchPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-gaa-green" /></div>}>
+      <NewMatchPageContent />
+    </Suspense>
   );
 }

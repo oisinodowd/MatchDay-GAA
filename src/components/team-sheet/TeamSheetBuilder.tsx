@@ -3,10 +3,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useMatchStore, Player } from '@/stores/match-store';
 import { generateId, validateTeamPlayers } from '@/lib/utils/helpers';
-import PhotoUpload from './PhotoUpload';
-import PositionSelector from './PositionSelector';
-import { db, type SavedTeamSheet } from '@/lib/db/matchday-db';
-import { Plus, Trash2, ChevronUp, ChevronDown, UserPlus, AlertCircle, CheckCircle2, GripVertical, Save } from 'lucide-react';
+import FormationPitch, { mapPlayersToFormationIndices } from './FormationPitch';
+import { db } from '@/lib/db/matchday-db';
+import { Plus, Trash2, UserPlus, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 interface TeamSheetBuilderProps {
   teamName: string;
@@ -190,6 +189,61 @@ export default function TeamSheetBuilder({ teamName, teamSide, initialPlayers, o
         )}
       </div>
 
+      {/* Formation Pitch Preview */}
+      {players.length > 0 && (
+        <div className="mb-4">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
+            Formation Preview
+          </h3>
+          <FormationPitch
+            players={players}
+            teamSide={teamSide}
+            compact
+            interactive
+            onDropPlayer={(slotIndex, playerIndex) => {
+              // Map slot index → position
+              let position: string;
+              if (slotIndex === 0) position = 'GK';
+              else if (slotIndex <= 6) position = 'DEF';
+              else if (slotIndex <= 8) position = 'MID';
+              else position = 'FWD';
+
+              setPlayers(prev => {
+                const newPlayers = [...prev];
+                const dragged = newPlayers[playerIndex];
+                if (!dragged) return prev;
+
+                // Update the dragged player's position
+                newPlayers[playerIndex] = { ...dragged, position };
+
+                // If the player was a sub (index >= 15), move them into the top 15
+                if (playerIndex >= 15 && newPlayers.length > 14) {
+                  // Find the current occupant of this slot
+                  const formation = mapPlayersToFormationIndices(newPlayers);
+                  const occupantIdx = formation[slotIndex];
+                  
+                  if (occupantIdx !== null && occupantIdx >= 0 && occupantIdx < 15 && occupantIdx !== playerIndex) {
+                    // Swap the sub with the player currently in that slot
+                    const temp = newPlayers[playerIndex];
+                    newPlayers[playerIndex] = newPlayers[occupantIdx];
+                    newPlayers[occupantIdx] = temp;
+                  } else if (newPlayers.length > 14) {
+                    // No specific occupant — move to index 14 (last starter)
+                    const moved = newPlayers.splice(playerIndex, 1)[0];
+                    newPlayers.splice(14, 0, moved);
+                  }
+                }
+
+                return newPlayers.map((p, i) => ({
+                  ...p,
+                  isStarter: i < 15,
+                }));
+              });
+            }}
+          />
+        </div>
+      )}
+
       {/* Player Count Badge */}
       <div className="flex items-center gap-3 mb-4 text-sm">
         <span className={`px-2 py-1 rounded-full ${starters.length === 15 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
@@ -359,108 +413,176 @@ interface PlayerRowProps {
   canMoveDown: boolean;
 }
 
-function PlayerRow({ player, index, onUpdate, onRemove, onMoveUp, onMoveDown, onDropOn, canMoveUp, canMoveDown }: PlayerRowProps) {
-  const [showPhotoUpload, setShowPhotoUpload] = useState(false);
+const POSITION_COLORS: Record<string, { dot: string; accent: string; text: string }> = {
+  GK:  { dot: '#eab308', accent: '#fef9c3', text: '#854d0e' },
+  DEF: { dot: '#3b82f6', accent: '#dbeafe', text: '#1e40af' },
+  MID: { dot: '#22c55e', accent: '#dcfce7', text: '#166534' },
+  FWD: { dot: '#ef4444', accent: '#fee2e2', text: '#991b1b' },
+  SUB: { dot: '#9ca3af', accent: '#f3f4f6', text: '#4b5563' },
+};
 
-  const handlePhotoChange = async (file: File) => {
-    try {
-      const { compressImage } = await import('@/lib/utils/image-utils');
-      const compressed = await compressImage(file);
-      onUpdate({ photoUrl: compressed });
-    } catch (error) {
-      console.error('Failed to compress image:', error);
-    }
-  };
+function PlayerRow({ player, index, onUpdate, onRemove, onMoveUp, onMoveDown, onDropOn, canMoveUp, canMoveDown }: PlayerRowProps) {
+  const pc = POSITION_COLORS[player.position || 'SUB'] || POSITION_COLORS.SUB;
+  const [dragOver, setDragOver] = useState(false);
 
   return (
-    <div className="flex items-center gap-2 p-3 rounded-lg border bg-white relative" draggable={true} onDragStart={(e) => { e.dataTransfer.setData('text/plain', String(index)); e.currentTarget.style.opacity = '0.5'; }} onDragEnd={(e) => { e.currentTarget.style.opacity = '1'; }} onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-gaa-green', 'bg-green-100'); }} onDragLeave={(e) => { e.currentTarget.classList.remove('border-gaa-green', 'bg-green-100'); }} onDrop={(e) => { e.preventDefault(); e.currentTarget.classList.remove('border-gaa-green', 'bg-green-100'); const draggedIndex = parseInt(e.dataTransfer.getData('text/plain')); if (onDropOn && draggedIndex !== index) { onDropOn(index); } }}>
-      {/* Drag Handle */}
-      <div className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600">
-        <GripVertical className="w-4 h-4" />
+    <div
+      draggable
+      onDragStart={(e) => { e.dataTransfer.setData('application/x-player-index', String(index)); }}
+      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => { e.preventDefault(); setDragOver(false); const from = parseInt(e.dataTransfer.getData('application/x-player-index')); if (onDropOn && !isNaN(from) && from !== index) onDropOn(index); }}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        padding: '10px 12px',
+        borderRadius: '12px',
+        background: dragOver ? '#f0fdf4' : '#ffffff',
+        border: dragOver ? '2px solid #22c55e' : '1px solid #e5e7eb',
+        boxShadow: dragOver ? '0 2px 8px rgba(34,197,94,0.15)' : '0 1px 2px rgba(0,0,0,0.04)',
+        transition: 'all 0.15s ease',
+        cursor: 'grab',
+        position: 'relative',
+        borderLeft: `3px solid ${pc.dot}`,
+      }}
+    >
+      {/* Grip */}
+      <div style={{ color: '#cbd5e1', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+          <circle cx="5" cy="3" r="1.2"/><circle cx="9" cy="3" r="1.2"/>
+          <circle cx="5" cy="7" r="1.2"/><circle cx="9" cy="7" r="1.2"/>
+          <circle cx="5" cy="11" r="1.2"/><circle cx="9" cy="11" r="1.2"/>
+        </svg>
       </div>
 
-      {/* Position Controls */}
-      <div className="flex flex-col gap-0.5">
-        <button
-          onClick={onMoveUp}
-          disabled={!canMoveUp}
-          className={`p-0.5 rounded ${canMoveUp ? 'hover:bg-gray-200' : 'text-gray-300 cursor-not-allowed'}`}
-        >
-          <ChevronUp className="w-3 h-3" />
+      {/* Reorder arrows */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', flexShrink: 0 }}>
+        <button onClick={onMoveUp} disabled={!canMoveUp} style={{ border: 'none', background: 'none', cursor: canMoveUp ? 'pointer' : 'default', opacity: canMoveUp ? 0.5 : 0.2, padding: 0, lineHeight: 0, color: '#6b7280' }}>
+          <svg width="10" height="10" viewBox="0 0 10 10"><path d="M5 2L1 7h8z" fill="currentColor"/></svg>
         </button>
-        <button
-          onClick={onMoveDown}
-          disabled={!canMoveDown}
-          className={`p-0.5 rounded ${canMoveDown ? 'hover:bg-gray-200' : 'text-gray-300 cursor-not-allowed'}`}
-        >
-          <ChevronDown className="w-3 h-3" />
+        <button onClick={onMoveDown} disabled={!canMoveDown} style={{ border: 'none', background: 'none', cursor: canMoveDown ? 'pointer' : 'default', opacity: canMoveDown ? 0.5 : 0.2, padding: 0, lineHeight: 0, color: '#6b7280' }}>
+          <svg width="10" height="10" viewBox="0 0 10 10"><path d="M5 8L1 3h8z" fill="currentColor"/></svg>
         </button>
       </div>
-
-      {/* Photo */}
-      <div className="relative">
-        {player.photoUrl ? (
-          <img
-            src={player.photoUrl}
-            alt={player.name || `Player ${index + 1}`}
-            className="w-8 h-8 rounded-full object-cover border-2 border-gaa-green"
-          />
-        ) : (
-          <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-            <span className="text-xs font-bold text-gray-500">{(index + 1).toString()[0]}</span>
-          </div>
-        )}
-        <button
-          onClick={() => setShowPhotoUpload(!showPhotoUpload)}
-          className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center text-white hover:bg-blue-600"
-        >
-          <Plus className="w-2.5 h-2.5" />
-        </button>
-      </div>
-
-      {/* Photo Upload Dropdown - positioned relative to parent */}
-      {showPhotoUpload && (
-        <div className="absolute z-50 left-0 top-full mt-1 w-64 bg-white rounded-lg shadow-xl border p-3">
-          <PhotoUpload
-            currentPhoto={player.photoUrl || ''}
-            onPhotoChange={handlePhotoChange}
-            onClear={() => onUpdate({ photoUrl: '' })}
-          />
-        </div>
-      )}
 
       {/* Jersey Number */}
-      <input
-        type="number"
-        value={player.number}
-        onChange={(e) => onUpdate({ number: parseInt(e.target.value) || 0 })}
-        className="w-12 text-center font-bold text-sm border rounded px-1 py-1"
-        min={1}
-        max={99}
-      />
+      <div style={{
+        width: '38px', height: '38px',
+        borderRadius: '50%',
+        background: player.position === 'GK' ? '#fef9c3' : player.position === 'DEF' ? '#dbeafe' : player.position === 'MID' ? '#dcfce7' : player.position === 'FWD' ? '#fee2e2' : '#f3f4f6',
+        border: `2px solid ${pc.dot}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0,
+      }}>
+        <input
+          type="number"
+          value={player.number}
+          onChange={(e) => onUpdate({ number: parseInt(e.target.value) || 0 })}
+          min={1} max={99}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            width: '100%',
+            background: 'transparent',
+            border: 'none',
+            textAlign: 'center',
+            fontSize: '15px',
+            fontWeight: 800,
+            color: '#1f2937',
+            outline: 'none',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            padding: 0,
+          }}
+        />
+      </div>
 
-      {/* Name Input */}
+      {/* Player Name Input */}
       <input
         type="text"
         value={player.name}
         onChange={(e) => onUpdate({ name: e.target.value })}
+        onClick={(e) => e.stopPropagation()}
         placeholder={`Player ${index + 1}`}
-        className="flex-1 text-sm border rounded px-2 py-1 min-w-0 text-gray-900 bg-white"
+        style={{
+          flex: 1,
+          minWidth: 0,
+          border: '1px solid #e5e7eb',
+          borderRadius: '8px',
+          padding: '8px 12px',
+          fontSize: '14px',
+          fontWeight: 500,
+          color: '#111827',
+          background: '#f9fafb',
+          outline: 'none',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+        }}
+        onFocus={(e) => {
+          e.target.style.borderColor = pc.dot;
+          e.target.style.boxShadow = `0 0 0 3px ${pc.dot}22`;
+          e.target.style.background = '#ffffff';
+        }}
+        onBlur={(e) => {
+          e.target.style.borderColor = '#e5e7eb';
+          e.target.style.boxShadow = 'none';
+          e.target.style.background = '#f9fafb';
+        }}
       />
 
       {/* Position Selector */}
-      <PositionSelector
-        value={player.position || 'SUB'}
-        onChange={(position) => onUpdate({ position })}
-        compact
-      />
+      <div style={{ flexShrink: 0, position: 'relative' }}>
+        <select
+          value={player.position || 'SUB'}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => onUpdate({ position: e.target.value })}
+          style={{
+            appearance: 'none',
+            WebkitAppearance: 'none',
+            padding: '7px 28px 7px 12px',
+            border: `1.5px solid ${pc.dot}`,
+            borderRadius: '20px',
+            fontSize: '11px',
+            fontWeight: 700,
+            color: pc.text,
+            background: pc.accent,
+            cursor: 'pointer',
+            outline: 'none',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            letterSpacing: '0.02em',
+          }}
+        >
+          <option value="GK" style={{ background: '#fff', color: '#1f2937' }}>GK</option>
+          <option value="DEF" style={{ background: '#fff', color: '#1f2937' }}>DEF</option>
+          <option value="MID" style={{ background: '#fff', color: '#1f2937' }}>MID</option>
+          <option value="FWD" style={{ background: '#fff', color: '#1f2937' }}>FWD</option>
+          <option value="SUB" style={{ background: '#fff', color: '#1f2937' }}>SUB</option>
+        </select>
+        {/* Custom dropdown arrow */}
+        <svg style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: pc.text, opacity: 0.6 }} width="10" height="10" viewBox="0 0 10 10"><path d="M2 3l3 4 3-4z" fill="currentColor"/></svg>
+      </div>
 
       {/* Remove Button */}
       <button
-        onClick={onRemove}
-        className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+        onClick={(e) => { e.stopPropagation(); onRemove(); }}
+        style={{
+          border: 'none',
+          background: 'none',
+          cursor: 'pointer',
+          padding: '4px',
+          borderRadius: '6px',
+          color: '#d1d5db',
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          transition: 'all 0.15s ease',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = '#fef2f2'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = '#d1d5db'; e.currentTarget.style.background = 'transparent'; }}
+        title="Remove player"
       >
-        <Trash2 className="w-4 h-4" />
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor">
+          <path d="M3.5 3.5l8 8m0-8l-8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+        </svg>
       </button>
     </div>
   );
